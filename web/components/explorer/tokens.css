@@ -1,0 +1,45 @@
+/* Global-scope design tokens for the redesigned explorer (design doc §1).
+   Plain CSS (not a module) — :root custom properties can't live in a CSS
+   Module (Next.js rejects "impure" selectors with no local class). Imported
+   only by components/PensumExplorer.tsx, so it never reaches /v1. */
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap");
+
+:root {
+  --ink: #1f2430;
+  --ink-2: #39404f;
+  --muted: #5b6272;
+  --muted-2: #6b7280;
+  --line: #e3e6eb;
+  --line-soft: #eef0f3;
+  --line-control: #dfe3e8;
+  --surface: #ffffff;
+  --surface-sunken: #f4f5f7;
+  --canvas: #f7f8fa;
+  --canvas-dot: #e2e5ea;
+  --band-a: #eceef2;
+  --band-b: #f2f3f6;
+  --seg-track: #eceef2;
+  --seg-track-sm: #eef0f3;
+
+  --accent: #1f6fc4;
+  --accent-hover: #16528f;
+  --accent-tint: #e8f1fb;
+  --accent-border: #b9d3f0;
+  --accent-soft: #8fb1dd;
+
+  --t-iele: #0e6b70;
+  --t-cb: #7a5212;
+  --t-otr: #4a4f5a;
+  --t-pro: #2356c4;
+  --t-ele: #a01d5d;
+  --t-cbu: #3d33a0;
+  --t-req: #4a5568;
+
+  --st-available: #16a34a;
+  --st-one: #d97706;
+  --st-one-text: #b45309;
+  --st-admin: #d97706;
+  --st-blocked-a: #eef0f3;
+  --st-blocked-b: #e3e6eb;
+  --st-planned: var(--accent);
+}
