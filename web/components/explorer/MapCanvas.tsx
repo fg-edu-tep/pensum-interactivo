@@ -157,7 +157,7 @@ export default function MapCanvas({
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleHover = useCallback(
     (id: string | null, rect?: DOMRect) => {
-      onHover(id);
+      if (id !== hoveredId) onHover(id); // guard against redundant re-fires
       if (hoverTimer.current) clearTimeout(hoverTimer.current);
       if (id && rect && !selectedId) {
         hoverTimer.current = setTimeout(() => setHoverRect(rect), 250);
@@ -165,7 +165,7 @@ export default function MapCanvas({
         setHoverRect(null);
       }
     },
-    [onHover, selectedId]
+    [onHover, selectedId, hoveredId]
   );
   useEffect(() => () => { if (hoverTimer.current) clearTimeout(hoverTimer.current); }, []);
 
@@ -267,25 +267,31 @@ export default function MapCanvas({
 
     for (const semester of semesters) {
       bySemester.get(semester)!.forEach((course, row) => {
+        // Full relation styling + map-wide dimming only kick in on a real
+        // SELECTION. Pure hover (nothing selected) is a much lighter touch —
+        // just a ring on the hovered card itself (§6.3 "Hovered (no
+        // selection)") plus preview edges — otherwise moving the mouse
+        // across the grid dims/undims dozens of cards on every card and
+        // reads as flicker.
         const inFocusSet =
-          course.id === focusId ||
+          course.id === selectedId ||
           (relaciones === "cadena" ? upstreamAll.has(course.id) : directAncestors.has(course.id)) ||
           downstream.has(course.id) ||
           unlockById.has(course.id) ||
           coreqNeighbors.has(course.id);
 
         let relation: RelationState = null;
-        if (focusId) {
-          if (course.id === focusId) relation = selectedId ? "selected" : "hovered";
+        if (selectedId) {
+          if (course.id === selectedId) relation = "selected";
           else if (unlockById.has(course.id)) relation = unlockById.get(course.id)!;
           else if (directAncestors.has(course.id)) relation = "directPrereq";
           else if (relaciones === "cadena" && upstreamAll.has(course.id)) relation = "chainIndirectFull";
-          else if (relaciones === "directas" && upstreamAll.has(course.id) && !directAncestors.has(course.id))
-            relation = null; // hidden in Directas — falls through to dimmed below
+        } else if (course.id === hoveredId) {
+          relation = "hovered";
         }
 
         const isDimmed =
-          (!quickMode && focusId !== null && !inFocusSet) ||
+          (!quickMode && selectedId !== null && !inFocusSet) ||
           (matchedIds !== null && !matchedIds.has(course.id));
 
         out.push({
@@ -319,6 +325,7 @@ export default function MapCanvas({
     mode,
     focusId,
     selectedId,
+    hoveredId,
     relaciones,
     upstreamAll,
     downstream,
@@ -340,17 +347,32 @@ export default function MapCanvas({
 
   const edges: Edge[] = useMemo(() => {
     if (!focusId) return [];
-    const ancestorSet = relaciones === "cadena" ? upstreamAll : directAncestors;
+    // EDGE-05: a real selection draws the full Directas/Toda-la-cadena set;
+    // pure hover (nothing selected) only draws a lightweight dashed preview
+    // for the hovered course's own direct edges — no chain traversal.
+    const isHoverPreview = !selectedId;
+    const ancestorSet = !isHoverPreview && relaciones === "cadena" ? upstreamAll : directAncestors;
     const inAncestorEdges = (id: string) => id === focusId || ancestorSet.has(id);
 
     const out: Edge[] = [];
     for (const c of courses) {
       for (const prereqId of c.prereqCourseIds) {
         const touchesFocus = c.id === focusId || prereqId === focusId;
-        const withinChain = relaciones === "cadena" && inAncestorEdges(c.id) && inAncestorEdges(prereqId);
+        const withinChain = !isHoverPreview && relaciones === "cadena" && inAncestorEdges(c.id) && inAncestorEdges(prereqId);
         if (!touchesFocus && !withinChain) continue;
 
         const isDirect = prereqId === focusId || c.id === focusId;
+        if (isHoverPreview) {
+          out.push({
+            id: `${prereqId}->${c.id}`,
+            source: prereqId,
+            target: c.id,
+            type: "smoothstep",
+            style: { stroke: CHAIN_COLOR, strokeWidth: 1.75, strokeDasharray: "5 4" },
+            markerEnd: { type: MarkerType.ArrowClosed, color: CHAIN_COLOR, width: 14, height: 14 },
+          });
+          continue;
+        }
         const unlockRel = prereqId === focusId ? unlockById.get(c.id) : null;
         const color = unlockRel === "unlockSole" ? UNLOCK_SOLE_COLOR : unlockRel === "unlockAmong" ? UNLOCK_AMONG_COLOR : isDirect ? PREREQ_COLOR : CHAIN_COLOR;
         out.push({
@@ -374,7 +396,7 @@ export default function MapCanvas({
       }
     }
     return out;
-  }, [courses, focusId, relaciones, upstreamAll, directAncestors, unlockById]);
+  }, [courses, focusId, selectedId, relaciones, upstreamAll, directAncestors, unlockById]);
 
   const [selectionSummary, setSelectionSummary] = useState("");
   useEffect(() => {
