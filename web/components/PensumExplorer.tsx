@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { AvailabilityStatus, CatalogPayload, ElectiveAssignment } from "@/lib/types";
 import {
   catalogCodesOf,
@@ -32,7 +33,9 @@ import MapCanvas, { type RelacionesMode } from "./explorer/MapCanvas";
 import SidePanel from "./explorer/SidePanel";
 import PlannerPanel from "./explorer/PlannerPanel";
 import OnboardingPanel, { HintPill } from "./explorer/OnboardingPanel";
-import { groupOf, type CourseGroup } from "./explorer/format";
+import Tour from "./explorer/Tour";
+import SetupSheet from "./explorer/SetupSheet";
+import { groupOf, toSentenceCase, type CourseGroup } from "./explorer/format";
 import "./explorer/tokens.css";
 import styles from "./explorer/explorer.module.css";
 
@@ -44,8 +47,13 @@ interface Props {
 export default function PensumExplorer({ data, mihorarioUrl }: Props) {
   const slug = data.catalog.slug;
   const rules = data.rules;
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
-  const [mode, setMode] = useState<"explore" | "progress">("explore");
+  const [mode, setMode] = useState<"explore" | "progress">(() =>
+    searchParams.get("modo") === "avance" ? "progress" : "explore"
+  );
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -66,6 +74,11 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
   const [shareFeedback, setShareFeedback] = useState<string | null>(null);
   const [onboardDismissed, setOnboardDismissed] = useState(false);
   const [hintDismissed, setHintDismissed] = useState(false);
+  const [setupOpen, setSetupOpen] = useState(false);
+  const [setupSeen, setSetupSeen] = useState(true); // true until hydrated, so it never flashes
+  const [setupPreviewIds, setSetupPreviewIds] = useState<string[]>([]);
+  const [tourStep, setTourStep] = useState<number | null>(null);
+  const [tourCompleted, setTourCompleted] = useState(true);
 
   useEffect(() => {
     try {
@@ -87,6 +100,13 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
     setAssignments(loadElectivesFromHash() ?? loadElectivesFromStorage(slug));
     setAttestationsMet(loadAttestationsFromHash() ?? loadAttestationsFromStorage(slug));
     setPlanned(new Map(Object.entries(loadPlannedFromStorage(slug))));
+    try {
+      setSetupSeen(localStorage.getItem(`pensum:${slug}:setup-seen`) === "1");
+      setTourCompleted(localStorage.getItem("pensum:tour-completed") === "1");
+    } catch {
+      setSetupSeen(false);
+      setTourCompleted(false);
+    }
     setHydrated(true);
   }, [slug]);
 
@@ -122,6 +142,12 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
   );
 
   const catalogCodes = useMemo(() => catalogCodesOf(courses), [courses]);
+
+  // §10.2 tour, step 1's spotlight target
+  const tourAnchorCourse = useMemo(
+    () => courses.find((c) => c.semester === 5 && !c.isPlaceholder) ?? courses.find((c) => !c.isPlaceholder) ?? null,
+    [courses]
+  );
   const selectedCourse = useMemo(() => courses.find((c) => c.id === selectedId) ?? null, [courses, selectedId]);
 
   const effectiveApproved = useMemo(() => {
@@ -139,16 +165,24 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
 
   const ruleCtx = useMemo(() => ({ rules, attestationsMet, approvedCredits: creditsDone }), [rules, attestationsMet, creditsDone]);
 
+  // ONB-10: while the setup sheet is open, preview its selection on the map
+  // instead of the real (still-empty) approved set — nothing is saved until
+  // the sheet's primary action.
+  const statusApprovedSet = useMemo(
+    () => (setupOpen ? new Set([...effectiveApproved, ...setupPreviewIds]) : effectiveApproved),
+    [setupOpen, effectiveApproved, setupPreviewIds]
+  );
+
   const { statusById, lockedIds } = useMemo(() => {
     const statusById = new Map<string, AvailabilityStatus>();
     const lockedIds = new Set<string>();
     for (const c of courses) {
-      const a = courseAvailability(c, effectiveApproved, catalogCodes, courses, ruleCtx);
+      const a = courseAvailability(c, statusApprovedSet, catalogCodes, courses, ruleCtx);
       statusById.set(c.id, a.status);
       if (a.gateReasons.length > 0) lockedIds.add(c.id);
     }
     return { statusById, lockedIds };
-  }, [courses, effectiveApproved, catalogCodes, ruleCtx]);
+  }, [courses, statusApprovedSet, catalogCodes, ruleCtx]);
 
   const matchedIds = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -184,6 +218,17 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
     return courses.filter((c) => c.prereqCourseIds.includes(selectedCourse.id)).map((c) => c.id);
   }, [courses, selectedCourse]);
 
+  // A11Y-05: polite live-region announcement on selection.
+  const [liveMessage, setLiveMessage] = useState("");
+  useEffect(() => {
+    if (!selectedCourse) return;
+    const n = selectedCourse.prereqCourseIds.length;
+    const m = directDependentIds.length;
+    setLiveMessage(
+      `${toSentenceCase(selectedCourse.name)} seleccionado. ${n} requisito${n === 1 ? "" : "s"}, desbloquea ${m}.`
+    );
+  }, [selectedCourse, directDependentIds]);
+
   const chainExtraCount = useMemo(() => {
     if (!selectedCourse || relaciones !== "cadena") return 0;
     const all = upstreamOf(courses, selectedCourse.id);
@@ -217,6 +262,33 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
     return out;
   }, [courses, planned, effectiveApproved, effectiveApprovedPlusPlanned, catalogCodes, ruleCtx]);
 
+  const finishTour = useCallback(() => {
+    setTourStep(null);
+    setTourCompleted(true);
+    try {
+      localStorage.setItem("pensum:tour-completed", "1");
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const startTour = useCallback(() => {
+    setOnboardDismissed(true);
+    setHintDismissed(true);
+    setMode("explore");
+    setSelectedId(null);
+    setTourStep(0);
+  }, []);
+  const advanceTour = useCallback(
+    (fromStep: number) => {
+      setTourStep((cur) => {
+        if (cur !== fromStep) return cur; // the real action didn't match the active step
+        return cur + 1 > 3 ? null : cur + 1;
+      });
+      if (fromStep === 3) finishTour();
+    },
+    [finishTour]
+  );
+
   const handleSelect = useCallback(
     (id: string) => {
       if (id === "") {
@@ -236,8 +308,9 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
       setSelectedId((prev) => (prev === id ? null : id));
       setPanelOpen(true);
       setHintDismissed(true);
+      if (tourStep === 0) advanceTour(0);
     },
-    [quickMode, approved, data.courses]
+    [quickMode, approved, data.courses, tourStep, advanceTour]
   );
 
   const handleQuickToggle = useCallback(() => {
@@ -247,12 +320,13 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
         return false;
       }
       setMode("progress");
+      router.replace(`${pathname}?modo=avance`, { scroll: false });
       setSelectedId(null);
       setPanelOpen(false);
       setStaged(new Set());
       return true;
     });
-  }, []);
+  }, [router, pathname]);
 
   const handleQuickFinish = useCallback(() => {
     const nextApproved = new Set([...approved, ...staged]);
@@ -271,6 +345,9 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
     if (unlocked.size > 0) {
       setJustUnlocked(unlocked);
       unlockTimer.current = setTimeout(() => setJustUnlocked(new Set()), 1900);
+      // CARD-14: polite announcement of what just became available.
+      const names = courses.filter((c) => unlocked.has(c.id)).map((c) => c.code);
+      setLiveMessage(`Se desbloquearon ${unlocked.size} curso${unlocked.size === 1 ? "" : "s"}: ${names.join(", ")}.`);
     } else {
       setJustUnlocked(new Set());
     }
@@ -370,18 +447,63 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
   const accent = data.catalog.accentColor ?? "#1f6fc4";
   const showCoursePanel = !quickMode && !!selectedCourse && panelOpen;
   const showEmptyPanel = !quickMode && !selectedCourse && mode === "explore" && !onboardDismissed;
-  const showPlanner = !quickMode && !selectedCourse && mode === "progress";
+  const showSetup = !quickMode && !selectedCourse && mode === "progress" && setupOpen;
+  const showPlanner = !quickMode && !selectedCourse && mode === "progress" && !setupOpen;
 
-  const handleModeChange = useCallback((m: "explore" | "progress") => {
-    setMode(m);
-    if (m === "explore") {
-      setQuickMode(false);
-      setStaged(new Set());
+  const markSetupSeen = useCallback(() => {
+    setSetupSeen(true);
+    setSetupOpen(false);
+    setSetupPreviewIds([]);
+    try {
+      localStorage.setItem(`pensum:${slug}:setup-seen`, "1");
+    } catch {
+      /* ignore */
     }
-  }, []);
+  }, [slug]);
+
+  const handleModeChange = useCallback(
+    (m: "explore" | "progress") => {
+      setMode(m);
+      if (m === "explore") {
+        setQuickMode(false);
+        setStaged(new Set());
+      } else if (!setupSeen && approved.size === 0 && planned.size === 0) {
+        // ONB-09: first-ever switch to Mi avance with nothing saved yet
+        setSetupOpen(true);
+      }
+      router.replace(m === "progress" ? `${pathname}?modo=avance` : pathname, { scroll: false });
+      if (tourStep === 3) finishTour();
+    },
+    [router, pathname, setupSeen, approved, planned, tourStep]
+  );
+
+  const handleSetupConfirm = useCallback(
+    (ids: string[]) => {
+      const nextApproved = new Set([...approved, ...ids]);
+      const nextEffective = new Set([...effectiveApproved, ...ids]);
+      const unlocked = new Set<string>();
+      for (const c of courses) {
+        if (nextEffective.has(c.id)) continue;
+        if (statusById.get(c.id) === "available") continue;
+        const now = courseAvailability(c, nextEffective, catalogCodes, courses, ruleCtx).status;
+        if (now === "available") unlocked.add(c.id);
+      }
+      setApproved(nextApproved);
+      markSetupSeen();
+      if (unlockTimer.current) clearTimeout(unlockTimer.current);
+      if (unlocked.size > 0) {
+        setJustUnlocked(unlocked);
+        unlockTimer.current = setTimeout(() => setJustUnlocked(new Set()), 1900);
+      }
+    },
+    [approved, effectiveApproved, courses, statusById, catalogCodes, ruleCtx, markSetupSeen]
+  );
 
   return (
     <div className={styles.shell} style={{ ["--accent" as string]: accent }}>
+      <div aria-live="polite" className={styles.srOnly}>
+        {liveMessage}
+      </div>
       <TopBar
         slug={slug}
         programName={data.catalog.programName}
@@ -394,9 +516,10 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
         attestations={rules.attestations}
         attestationsMet={attestationsMet}
         onOpenGrado={() => setGradoOpen(true)}
-        onHelp={() => setOnboardDismissed(false)}
+        onHelp={startTour}
         onShare={handleShare}
         shareFeedback={shareFeedback}
+        tourTargetMode={tourStep === 3}
       />
 
       {gradoOpen && (
@@ -413,13 +536,17 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
         hiddenGroups={hiddenGroups}
         onToggleGroup={handleToggleGroup}
         relaciones={relaciones}
-        onRelacionesChange={setRelaciones}
+        onRelacionesChange={(r) => {
+          setRelaciones(r);
+          if (tourStep === 1) advanceTour(1);
+        }}
         statusCounts={statusCounts}
         hiddenStatuses={hiddenStatuses}
         onToggleStatus={handleToggleStatus}
         quickMode={quickMode}
         onQuickToggle={handleQuickToggle}
         onReset={handleReset}
+        tourTargetRelaciones={tourStep === 1}
       />
 
       {quickMode && (
@@ -450,13 +577,23 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
           justUnlockedIds={justUnlocked}
           quickMode={quickMode}
           relaciones={relaciones}
-          panelOpen={showCoursePanel || showPlanner || showEmptyPanel}
+          panelOpen={showCoursePanel || showPlanner || showEmptyPanel || showSetup}
+          tourAnchorId={tourStep === 0 ? tourAnchorCourse?.id ?? null : null}
           onSelect={handleSelect}
           onHover={setHoveredId}
         />
 
-        {!hintDismissed && mode === "explore" && !selectedCourse && (
-          <HintPill onDismiss={() => setHintDismissed(true)} />
+        {!hintDismissed && tourStep === null && mode === "explore" && !selectedCourse && (
+          <HintPill onStartTour={startTour} />
+        )}
+
+        {tourStep !== null && (
+          <Tour
+            step={tourStep}
+            onNext={() => advanceTour(tourStep)}
+            onBack={() => setTourStep((s) => (s === null || s === 0 ? s : s - 1))}
+            onSkip={finishTour}
+          />
         )}
 
         {selectedCourse && !panelOpen && (
@@ -491,10 +628,27 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
             onSelectCourse={handleSelect}
             onCollapse={() => setPanelOpen(false)}
             onClose={() => { setSelectedId(null); setPanelOpen(false); }}
+            tourTargetChain={tourStep === 2}
           />
         )}
 
-        {showEmptyPanel && <OnboardingPanel onGoToProgress={() => handleModeChange("progress")} />}
+        {showEmptyPanel && (
+          <OnboardingPanel onGoToProgress={() => handleModeChange("progress")} onStartTour={startTour} />
+        )}
+
+        {showSetup && (
+          <>
+            <div className={styles.setupPreviewPill}>Vista previa: así quedaría tu mapa</div>
+            <SetupSheet
+              courses={courses}
+              approved={effectiveApproved}
+              onConfirm={handleSetupConfirm}
+              onSkip={markSetupSeen}
+              onBlank={markSetupSeen}
+              onPreviewChange={setSetupPreviewIds}
+            />
+          </>
+        )}
 
         {showPlanner && (
           <PlannerPanel

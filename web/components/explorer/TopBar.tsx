@@ -27,6 +27,7 @@ interface Props {
   onHelp: () => void;
   onShare: () => void;
   shareFeedback: string | null;
+  tourTargetMode?: boolean;
 }
 
 export default function TopBar({
@@ -44,6 +45,7 @@ export default function TopBar({
   onHelp,
   onShare,
   shareFeedback,
+  tourTargetMode,
 }: Props) {
   const [planOpen, setPlanOpen] = useState(false);
   const planRef = useRef<HTMLDivElement>(null);
@@ -113,7 +115,12 @@ export default function TopBar({
         )}
       </div>
 
-      <div className={styles.modeToggle} role="group" aria-label="Modo">
+      <div
+        className={styles.modeToggle}
+        role="group"
+        aria-label="Modo"
+        data-tour-target={tourTargetMode ? "true" : undefined}
+      >
         <button
           type="button"
           className={`${styles.modeBtn} ${mode === "explore" ? styles.active : ""}`}

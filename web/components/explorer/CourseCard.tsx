@@ -29,8 +29,9 @@ export interface CourseCardData {
   isStaged: boolean;
   isJustUnlocked: boolean;
   isDimmed: boolean;
+  isTourAnchor?: boolean;
   onClick: (id: string) => void;
-  onHover: (id: string | null) => void;
+  onHover: (id: string | null, rect?: DOMRect) => void;
 }
 
 const STATUS_LABEL: Record<AvailabilityStatus, string> = {
@@ -53,6 +54,7 @@ export default function CourseCard({ data }: { data: CourseCardData }) {
     isStaged,
     isJustUnlocked,
     isDimmed,
+    isTourAnchor,
     onClick,
     onHover,
   } = data;
@@ -87,10 +89,13 @@ export default function CourseCard({ data }: { data: CourseCardData }) {
       type="button"
       className={classNames}
       onClick={() => onClick(course.id)}
-      onMouseEnter={() => onHover(course.id)}
+      onMouseEnter={(e) => onHover(course.id, e.currentTarget.getBoundingClientRect())}
       onMouseLeave={() => onHover(null)}
+      onFocus={(e) => onHover(course.id, e.currentTarget.getBoundingClientRect())}
+      onBlur={() => onHover(null)}
       aria-label={`${course.code} ${title}, ${course.credits} créditos${accessibleState ? `, ${accessibleState}` : ""}`}
       title={title}
+      data-tour-target={isTourAnchor ? "true" : undefined}
     >
       <Handle type="target" position={Position.Left} style={{ opacity: 0 }} />
       {reqNumber != null && <span className={styles.numberBadge}>{reqNumber}</span>}

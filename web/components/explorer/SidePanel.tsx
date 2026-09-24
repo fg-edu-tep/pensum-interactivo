@@ -84,6 +84,7 @@ interface Props {
   onSelectCourse: (id: string) => void;
   onCollapse: () => void;
   onClose: () => void;
+  tourTargetChain?: boolean;
 }
 
 export default function SidePanel({
@@ -111,6 +112,7 @@ export default function SidePanel({
   onSelectCourse,
   onCollapse,
   onClose,
+  tourTargetChain,
 }: Props) {
   if (!course) {
     return (
@@ -207,6 +209,7 @@ export default function SidePanel({
             mode={mode}
             approved={approved}
             onSelect={onSelectCourse}
+            tourTarget={tourTargetChain}
           />
         )}
 
