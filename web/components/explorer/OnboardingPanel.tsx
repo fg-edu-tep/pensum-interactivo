@@ -15,7 +15,13 @@ const STEPS = [
 
 const KEY_GROUPS: CourseGroup[] = ["iele", "cb", "otr", "pro"];
 
-export default function OnboardingPanel({ onGoToProgress }: { onGoToProgress: () => void }) {
+export default function OnboardingPanel({
+  onGoToProgress,
+  onStartTour,
+}: {
+  onGoToProgress: () => void;
+  onStartTour: () => void;
+}) {
   return (
     <aside className={styles.panel}>
       <div className={styles.panelHeader}>
@@ -56,6 +62,9 @@ export default function OnboardingPanel({ onGoToProgress }: { onGoToProgress: ()
         </div>
       </div>
       <div className={styles.panelFooter}>
+        <button className={styles.btnPrimary} onClick={onStartTour}>
+          Hacer el recorrido
+        </button>
         <button className={styles.btnGhostFooter} onClick={onGoToProgress}>
           Ir a Mi avance
         </button>
@@ -64,13 +73,13 @@ export default function OnboardingPanel({ onGoToProgress }: { onGoToProgress: ()
   );
 }
 
-export function HintPill({ onDismiss }: { onDismiss: () => void }) {
+export function HintPill({ onStartTour }: { onStartTour: () => void }) {
   return (
     <div className={styles.hintPill}>
       <PointerIcon />
       Toca un curso para ver qué necesitas y qué te abre
-      <button className={styles.hintPillCta} onClick={onDismiss}>
-        Entendido
+      <button className={styles.hintPillCta} onClick={onStartTour}>
+        Recorrido de 1 min
       </button>
     </div>
   );

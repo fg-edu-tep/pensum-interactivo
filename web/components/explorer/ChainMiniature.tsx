@@ -34,6 +34,7 @@ interface Props {
   mode: "explore" | "progress";
   approved: Set<string>;
   onSelect: (id: string) => void;
+  tourTarget?: boolean;
 }
 
 export default function ChainMiniature({
@@ -44,13 +45,14 @@ export default function ChainMiniature({
   mode,
   approved,
   onSelect,
+  tourTarget,
 }: Props) {
   const byId = new Map(allCourses.map((c) => [c.id, c]));
   const directAncestors = course.prereqCourseIds.map((id) => byId.get(id)).filter((c): c is Course => !!c);
   const dependents = directDependentIds.map((id) => byId.get(id)).filter((c): c is Course => !!c);
 
   return (
-    <div className={styles.box}>
+    <div className={styles.box} data-tour-target={tourTarget ? "true" : undefined}>
       <div className={styles.chain}>
         <div className={styles.chainCol}>
           <span className={styles.lbl}>Necesitas</span>

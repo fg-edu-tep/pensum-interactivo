@@ -35,6 +35,7 @@ interface Props {
   quickMode: boolean;
   onQuickToggle: () => void;
   onReset: () => void;
+  tourTargetRelaciones?: boolean;
 }
 
 export default function Toolbar({
@@ -49,6 +50,7 @@ export default function Toolbar({
   quickMode,
   onQuickToggle,
   onReset,
+  tourTargetRelaciones,
 }: Props) {
   if (mode === "explore") {
     return (
@@ -77,7 +79,12 @@ export default function Toolbar({
         </div>
         <div className={styles.vDivider} />
         <span className={styles.lbl}>Relaciones</span>
-        <div className={styles.segSm} role="group" aria-label="Relaciones">
+        <div
+          className={styles.segSm}
+          role="group"
+          aria-label="Relaciones"
+          data-tour-target={tourTargetRelaciones ? "true" : undefined}
+        >
           <button
             type="button"
             className={`${styles.segSmBtn} ${relaciones === "directas" ? styles.active : ""}`}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactFlow, {
   Background,
   MarkerType,
@@ -8,11 +8,14 @@ import ReactFlow, {
   useReactFlow,
   type Edge,
   type Node,
+  type ReactFlowInstance,
+  type Viewport,
 } from "reactflow";
 import "reactflow/dist/style.css";
 import type { Course, AvailabilityStatus } from "@/lib/types";
 import { upstreamOf, downstreamOf, unlockRelation } from "@/lib/availability";
 import { numberRequirementGroups } from "./reqGroups";
+import { toSentenceCase } from "./format";
 import CourseCard, { type RelationState } from "./CourseCard";
 import { PlusIcon, MinusIcon, FitIcon } from "./icons";
 import styles from "./explorer.module.css";
@@ -118,6 +121,7 @@ interface Props {
   quickMode: boolean;
   relaciones: RelacionesMode;
   panelOpen: boolean;
+  tourAnchorId?: string | null;
   onSelect: (id: string) => void;
   onHover: (id: string | null) => void;
 }
@@ -136,6 +140,7 @@ export default function MapCanvas({
   quickMode,
   relaciones,
   panelOpen,
+  tourAnchorId = null,
   onSelect,
   onHover,
 }: Props) {
@@ -145,6 +150,24 @@ export default function MapCanvas({
   const selected = selectedId ? byId.get(selectedId) ?? null : null;
   const focusId = selectedId ?? hoveredId;
   const focusCourse = selectedId ? selected : focusId ? byId.get(focusId) ?? null : null;
+
+  // ONB-02: hover tooltip, shown ~250ms after entering a card while nothing
+  // is selected (progressive disclosure — matches EDGE-05's hover preview).
+  const [hoverRect, setHoverRect] = useState<DOMRect | null>(null);
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleHover = useCallback(
+    (id: string | null, rect?: DOMRect) => {
+      onHover(id);
+      if (hoverTimer.current) clearTimeout(hoverTimer.current);
+      if (id && rect && !selectedId) {
+        hoverTimer.current = setTimeout(() => setHoverRect(rect), 250);
+      } else {
+        setHoverRect(null);
+      }
+    },
+    [onHover, selectedId]
+  );
+  useEffect(() => () => { if (hoverTimer.current) clearTimeout(hoverTimer.current); }, []);
 
   const upstreamAll = useMemo(
     () => (focusId ? upstreamOf(courses, focusId) : new Set<string>()),
@@ -281,8 +304,9 @@ export default function MapCanvas({
             isStaged: stagedIds.has(course.id),
             isJustUnlocked: justUnlockedIds.has(course.id),
             isDimmed,
+            isTourAnchor: tourAnchorId === course.id,
             onClick: onSelect,
-            onHover,
+            onHover: handleHover,
           },
           draggable: false,
           zIndex: 1,
@@ -309,8 +333,9 @@ export default function MapCanvas({
     justUnlockedIds,
     quickMode,
     reqNumberByCourseId,
+    tourAnchorId,
     onSelect,
-    onHover,
+    handleHover,
   ]);
 
   const edges: Edge[] = useMemo(() => {
@@ -371,12 +396,38 @@ export default function MapCanvas({
     }
   }, [selected, unlockById, relaciones, upstreamAll]);
 
+  // MAP-05: fade + pan-to-hidden-semester chips at each edge that's cut off.
+  const semesterCount = useMemo(() => new Set(courses.map((c) => c.semester)).size, [courses]);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const [viewport, setViewportState] = useState<Viewport>({ x: 0, y: 0, zoom: 1 });
+  const rfInstance = useRef<ReactFlowInstance | null>(null);
+  useEffect(() => {
+    if (!wrapRef.current) return;
+    const ro = new ResizeObserver((entries) => setContainerWidth(entries[0].contentRect.width));
+    ro.observe(wrapRef.current);
+    return () => ro.disconnect();
+  }, []);
+  const leftContentX = INSET_X - 8;
+  const rightContentX = INSET_X - 8 + (semesterCount - 1) * COL_PITCH + (CARD_W + 16);
+  const screenX = (x: number) => x * viewport.zoom + viewport.x;
+  const leftCut = containerWidth > 0 && screenX(leftContentX) < -4;
+  const rightCut = containerWidth > 0 && screenX(rightContentX) > containerWidth + 4;
+  const panColumns = (delta: number) => {
+    rfInstance.current?.setViewport(
+      { x: viewport.x - delta * COL_PITCH * viewport.zoom, y: viewport.y, zoom: viewport.zoom },
+      { duration: 250 }
+    );
+  };
+
   return (
-    <div className={styles.canvasWrap}>
+    <div className={styles.canvasWrap} ref={wrapRef}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
+        onInit={(inst) => (rfInstance.current = inst)}
+        onMove={(_, vp) => setViewportState(vp)}
         fitView
         fitViewOptions={{ padding: 0.12 }}
         minZoom={0.4}
@@ -415,6 +466,35 @@ export default function MapCanvas({
             Limpiar Esc
           </button>
         </div>
+      )}
+      {!selectedId && hoveredId && hoverRect && focusCourse && (
+        <div
+          className={styles.tooltip}
+          style={{ left: Math.min(hoverRect.left, window.innerWidth - 280), top: hoverRect.bottom + 8 }}
+        >
+          <div className={styles.tooltipTitle}>{toSentenceCase(focusCourse.name)}</div>
+          <div className={styles.tooltipMeta}>
+            {directAncestors.size} requisito{directAncestors.size === 1 ? "" : "s"} · Desbloquea{" "}
+            {[...unlockById.values()].filter(Boolean).length} · {focusCourse.credits} cr
+          </div>
+          <div className={styles.tooltipHint}>Clic para ver su ruta completa</div>
+        </div>
+      )}
+      {leftCut && (
+        <>
+          <div className={`${styles.edgeFade} ${styles.edgeFadeLeft}`} />
+          <button className={`${styles.hiddenChip} ${styles.hiddenChipLeft}`} onClick={() => panColumns(-3)}>
+            ← anteriores
+          </button>
+        </>
+      )}
+      {rightCut && (
+        <>
+          <div className={`${styles.edgeFade} ${styles.edgeFadeRight}`} />
+          <button className={`${styles.hiddenChip} ${styles.hiddenChipRight}`} onClick={() => panColumns(3)}>
+            siguientes →
+          </button>
+        </>
       )}
     </div>
   );
