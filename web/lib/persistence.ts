@@ -13,6 +13,30 @@ function electivesKey(slug: string) {
 function attestKey(slug: string) {
   return `pensum:${slug}:requisitos`;
 }
+function plannedKey(slug: string) {
+  return `pensum:${slug}:plan`;
+}
+
+/** courseId -> term code ("202710"). New-design-only (§9 planner); the
+ * legacy explorer never reads or writes this key. */
+export type PlannedByTerm = Record<string, string>;
+
+export function loadPlannedFromStorage(slug: string): PlannedByTerm {
+  try {
+    const raw = localStorage.getItem(plannedKey(slug));
+    return raw ? (JSON.parse(raw) as PlannedByTerm) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function savePlannedToStorage(slug: string, planned: PlannedByTerm) {
+  try {
+    localStorage.setItem(plannedKey(slug), JSON.stringify(planned));
+  } catch {
+    /* storage unavailable */
+  }
+}
 
 export function loadApprovedFromStorage(slug: string): Set<string> {
   try {
@@ -70,7 +94,7 @@ export function saveAttestationsToStorage(slug: string, ids: Set<string>) {
 
 /** Wipe all progress for one plan (approved courses + elective picks + requisitos). */
 export function resetProgress(slug: string) {
-  for (const k of [storageKey(slug), electivesKey(slug), attestKey(slug)]) {
+  for (const k of [storageKey(slug), electivesKey(slug), attestKey(slug), plannedKey(slug)]) {
     try {
       localStorage.removeItem(k);
     } catch {
