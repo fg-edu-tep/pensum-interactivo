@@ -443,7 +443,101 @@ format for the P2 importer (not consumed by the current `seed.ts`).
   Programa" pools) — workable, but loses precision a real importer should
   capture structurally. See "Next" below.
 
+**Session 2026-09-30 — explorer hover-flicker fix + Banner/Registro master-Excel prereq pipeline.**
+
+- **Distinguish "unverified" from "not offered" in the offering box
+  (`components/explorer/SidePanel.tsx`, `components/legacy/SidePanel.tsx`,
+  `app/globals.css`, `components/explorer/explorer.module.css`).**
+  `offering === undefined` (pairing never ran/confirmed anything for this
+  course) was rendering identically to `offering.offered === false` (the
+  live API confirmed zero sections this term) — same grey box, same "No se
+  dicta" text, even though the first case is "we don't know" and the second
+  is "we checked and it's not happening." Added a third `unknown` state
+  (hollow dot, dashed box border, "Sin verificar en la oferta en línea") in
+  both the new explorer and legacy `SidePanel`, so a course that was never
+  paired doesn't get quietly misreported as confirmed-not-offered.
+- **Explorer hover-flicker fix (`components/explorer/MapCanvas.tsx`).** Reported
+  independently of the 2026-09-24 review meeting: rapidly sweeping the cursor
+  across the course grid in the new `/p` explorer flickered / briefly went
+  blank. Root cause: `handleHover` called `onHover(id)` — which feeds
+  `hoveredId` into the `useMemo` that rebuilds the highlighted nodes/edges —
+  on *every* `mouseenter`, so crossing a dozen cards a second tore down and
+  rebuilt the highlighted-edge set at the same rate. Confirmed by
+  instrumenting the live page: a synthetic 60-card sweep produced continuous
+  edge-count churn (`0→7→0→5→0…`, changing every 15-30ms) while node count
+  stayed flat. Fix: debounce the *commit* of a new hover target by 70ms
+  (clearing immediately on mouse-leave so nothing lingers); the existing
+  250ms tooltip-position debounce is untouched. Re-verified after the fix:
+  the same 60-card sweep produces **zero** edge churn, while pausing on a
+  single card still commits the highlight normally. Confirmed the legacy
+  `/v1` view has no hover-driven code path at all (`CourseNode.tsx` /
+  `CurriculumGraph.tsx` — no `onMouseEnter` anywhere), so this bug and fix
+  are scoped to the new explorer only. `npm run build` passes.
+- **Banner/Registro master Excel as the prereq/coreq/name/credits source
+  (`lib/import/parsePrereqExport.ts`, `scripts/seed.ts`).** Mauricio's
+  official Registro export landed at the repo root as `Excel_Registro.xlsx`
+  (sheet `Export`, ~116,700 rows, every term back to ~2004 — replaces the
+  old pre-filtered `PRERREQUISITOS TODOS 202620.xlsx`, 2900 rows / one term).
+  Same column schema, so the existing parser mostly worked — but found a
+  real landmine before shipping it: **within the master file a course code's
+  rows are not chronological — newest period first** (e.g. `IELE-1002`:
+  `202620, 202610, 202520, … 200620`). The old parser's `map.set(code, …)`
+  "last row wins" logic, correct for the old single-term file, would have
+  silently kept each course's *oldest* prereq/credits/name on file (in some
+  cases a ~2007 snapshot) instead of the current one. Fixed:
+  `parsePrereqExport(buffer, term)` now takes an explicit term and skips any
+  row whose `Periodo` doesn't match it before building the map; `seed.ts`
+  passes `OFFERINGS_TERM` (default `202620`) through. Verified two ways: (1)
+  a direct parser call against `Excel_Registro.xlsx` at term 202620 — e.g.
+  `IELE3200` ("Electrónica Análoga") prereq resolves to `IELE 2206`, *not*
+  `IELE 2100`, confirming Mauricio's B-2 correction (Análoga doesn't depend
+  on Elementos) holds once a pensum slot actually points at the right code;
+  (2) a full local `SEED_REBUILD_COURSES=1 npm run seed` against the local
+  docker Postgres — 2624 rows at term 202620, all 5 catalogs at their prior
+  course counts, no crashes/warnings beyond the pre-existing known SEM
+  column quirk (see Gotchas).
+- **`findFile()` hardened (`scripts/seed.ts`).** Previously assumed exactly
+  one file matches each glob; with both the old and new prereq files
+  present at once that silently depended on filesystem directory-listing
+  order. Now: multiple matches log a loud warning and deterministically
+  prefer `Excel_Registro*` over `PRERREQUISITOS*` rather than picking
+  whichever the FS happens to list first.
+- **Repo cleanup.** Removed the now-superseded `PRERREQUISITOS TODOS
+  202620.xlsx` (tracked, 2900-row single-term file) and an untracked
+  byte-identical duplicate of the master file (`Prerrequisitos UA
+  202620.xlsx`) — confirmed via `md5sum` before deleting. `Excel_Registro.xlsx`
+  is now the sole, canonical prereq-export input at the repo root.
+  `CLAUDE.md`'s source-data bullet updated to match and to spell out the
+  pensum-structure vs. prereq-data split (D-3 in the 2026-09-24 review).
+- **Found, not fixed: the actual B-2 root cause lives in the *pensum*
+  Excel, not the prereq one.** `PENSUMS PREGRADO (DOCUMENTO BASE)) CBU3.xlsx`
+  (unchanged, still the department's tracked file) still places `IELE3106`
+  ("Electrónica de Potencia") in the semester-6 slot of `iele-cbu3` /
+  `ielc-cbu3` where it should be `IELE3200` ("Electrónica Análoga") — this
+  is *which course occupies which slot*, D-3's other, separate input, and
+  `Excel_Registro.xlsx` can't fix it by itself. The 2026-09-24 session
+  patched this directly on the **Neon prod DB** via an ad-hoc script
+  (`manuallyEdited: true`), but that patch was never written back into the
+  tracked `PENSUMS…xlsx` — so today's rebuild reproduced the mislabeling
+  locally (now correctly surfaced as "Electrónica de Potencia," rather than
+  silently papered over), and running `SEED_REBUILD_COURSES=1` against
+  **prod** as-is would discard that session's hand patches (13
+  `CatalogCourse` rebinds, 3 new `Course` rows, 7 dropped `ManualPairing`
+  rows) since none of them are reflected in the tracked source Excel.
+  **Not done today, deliberately:** touching the Neon prod DB. Everything
+  above was verified only against the local docker-compose Postgres. Before
+  a `SEED_REBUILD_COURSES=1` run against prod: either get Mauricio's
+  corrected `PENSUMS` Excel (M-2) so the rebuild reproduces the same fixes
+  structurally, or re-apply the 2026-09-24 hand patches after rebuilding.
+
 ## Next
+
+**Apply the Excel_Registro-based rebuild to prod, correctly.** Get Mauricio's
+corrected `PENSUMS PREGRADO` Excel (the `IELE3106`→`IELE3200` slot fix, M-2)
+before running `SEED_REBUILD_COURSES=1` against Neon — otherwise it silently
+reverts the 2026-09-24 hand patches described above. Once the corrected
+pensum Excel is in, cross-check every row against the rendered pensum (D-2)
+before treating the rebuild as safe to run on prod.
 
 **P2.2 — direct editors** (DB-authoritative CRUD): catalog identity + `Catalog.rules`
 (attestations/gates) form; `CatalogCourse` table editor (every field, add/remove,

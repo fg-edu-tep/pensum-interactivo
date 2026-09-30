@@ -26,9 +26,20 @@ import { OfferingsCache } from "../lib/pairing/offeringsCache";
 import { prisma, applySqlitePragmas } from "../lib/db";
 
 function findFile(dir: string, re: RegExp): string {
-  const hit = readdirSync(dir).find((f) => re.test(f));
-  if (!hit) throw new Error(`No file matching ${re} in ${dir}`);
-  return join(dir, hit);
+  const hits = readdirSync(dir).filter((f) => re.test(f));
+  if (!hits.length) throw new Error(`No file matching ${re} in ${dir}`);
+  if (hits.length > 1) {
+    // Directory listing order isn't a reliable tie-breaker across filesystems
+    // — pick deterministically (prefer "Excel_Registro", the canonical master
+    // export) and say so loudly rather than silently depending on FS order.
+    const preferred = hits.find((f) => /^Excel_Registro/i.test(f)) ?? hits.sort()[0];
+    console.warn(
+      `  ! multiple files match ${re} in ${dir}: ${hits.join(", ")} — using "${preferred}". ` +
+        `Remove the stale one(s) to silence this.`
+    );
+    return join(dir, preferred);
+  }
+  return join(dir, hits[0]);
 }
 
 async function main() {
@@ -43,7 +54,10 @@ async function main() {
   const rebuildCourses = process.env.SEED_REBUILD_COURSES === "1";
 
   const pensumPath = findFile(seedDir, /^PENSUMS.*\.xlsx$/i);
-  const prereqPath = findFile(seedDir, /^PRERREQUISITOS.*\.xlsx$/i);
+  // "Excel_Registro.xlsx" is the canonical Banner/Registro master export as of
+  // 2026-09; "PRERREQUISITOS*.xlsx" is the older pre-filtered single-term name
+  // — both match so a re-export under either naming convention still seeds.
+  const prereqPath = findFile(seedDir, /^(PRERREQUISITOS|Excel_Registro).*\.xlsx$/i);
   console.log(`seed dir : ${seedDir}`);
   console.log(`pensum   : ${pensumPath}`);
   console.log(`prereqs  : ${prereqPath}`);
@@ -65,7 +79,7 @@ async function main() {
   await applySqlitePragmas();
 
   const catalogs = parsePensumWorkbook(readFileSync(pensumPath));
-  const prereqMap = parsePrereqExport(readFileSync(prereqPath));
+  const prereqMap = parsePrereqExport(readFileSync(prereqPath), term);
   console.log(`\nparsed ${catalogs.length} catalogs, ${prereqMap.size} prereq rows\n`);
 
   const cache = new OfferingsCache();

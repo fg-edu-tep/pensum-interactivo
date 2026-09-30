@@ -17,7 +17,11 @@ what's next (P2 admin, P3 Docker), and the gotchas.
 
 - `web/` — the Next.js app (all `npm run *` commands run **here**, not the repo root)
 - `app/` — the original Vite SPA, kept as migration reference until P1 is signed off, then deleted
-- `PENSUMS PREGRADO (DOCUMENTO BASE)) CBU3.xlsx`, `PRERREQUISITOS TODOS 202620.xlsx` — source data the seed/import reads
+- `PENSUMS PREGRADO (DOCUMENTO BASE)) CBU3.xlsx` — pensum structure (which course sits in
+  which semester), owned by the department. `Excel_Registro.xlsx` — the Banner/Registro
+  master export (prereqs/coreqs/names/credits/restrictions, ~117k rows spanning every term
+  back to ~2004); the seed filters it to `OFFERINGS_TERM` (see `web/scripts/seed.ts`). These
+  are two separate inputs — the seed/import reads both.
 - `pensum-interactivo-product-doc.md` — earlier product doc (its Python/Postgres stack is superseded; see `.claude/PLAN.md`)
 
 ## Quick start
