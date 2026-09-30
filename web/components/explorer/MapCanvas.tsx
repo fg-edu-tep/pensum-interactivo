@@ -155,9 +155,23 @@ export default function MapCanvas({
   // is selected (progressive disclosure — matches EDGE-05's hover preview).
   const [hoverRect, setHoverRect] = useState<DOMRect | null>(null);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // `onHover(id)` drives the full upstream/downstream/edge recompute below,
+  // so firing it on every card the cursor passes over (sweeping the grid can
+  // cross a dozen cards a second) remounts the highlighted-edge set at the
+  // same rate — that remount churn is what reads as "flicker". Debounce the
+  // highlight commit so only a brief pause on a card triggers it; clearing
+  // still happens immediately so a stale highlight never lingers.
+  const focusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleHover = useCallback(
     (id: string | null, rect?: DOMRect) => {
-      if (id !== hoveredId) onHover(id); // guard against redundant re-fires
+      if (focusTimer.current) clearTimeout(focusTimer.current);
+      if (id === null) {
+        if (hoveredId !== null) onHover(null);
+      } else {
+        focusTimer.current = setTimeout(() => {
+          if (id !== hoveredId) onHover(id);
+        }, 70);
+      }
       if (hoverTimer.current) clearTimeout(hoverTimer.current);
       if (id && rect && !selectedId) {
         hoverTimer.current = setTimeout(() => setHoverRect(rect), 250);
@@ -167,7 +181,13 @@ export default function MapCanvas({
     },
     [onHover, selectedId, hoveredId]
   );
-  useEffect(() => () => { if (hoverTimer.current) clearTimeout(hoverTimer.current); }, []);
+  useEffect(
+    () => () => {
+      if (hoverTimer.current) clearTimeout(hoverTimer.current);
+      if (focusTimer.current) clearTimeout(focusTimer.current);
+    },
+    []
+  );
 
   const upstreamAll = useMemo(
     () => (focusId ? upstreamOf(courses, focusId) : new Set<string>()),
