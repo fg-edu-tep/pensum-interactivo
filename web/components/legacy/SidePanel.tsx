@@ -113,12 +113,18 @@ function OfferingSection({
     ? `${mihorarioUrl}${mihorarioUrl.includes("?") ? "&" : "?"}nameInput=${encodeURIComponent(code)}`
     : null;
 
+  // `offering === undefined` (pairing never confirmed anything for this
+  // course) is a different, honest state from "the live API said zero
+  // sections this term" (offered: false) — don't collapse them.
   let dotClass = "off";
   let line = "No se ofrece este periodo";
-  if (offering?.syncFailed) {
+  if (offering === undefined) {
+    dotClass = "unknown";
+    line = "Sin verificar en la oferta en línea";
+  } else if (offering.syncFailed) {
     dotClass = "stale";
     line = "Sin datos de oferta (revisar sincronización)";
-  } else if (offering?.offered) {
+  } else if (offering.offered) {
     dotClass = "on";
     line = "Se dicta este periodo";
   }

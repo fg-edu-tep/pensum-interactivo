@@ -1040,6 +1040,10 @@
 .offerBox.on { background: #f3faf5; border-color: #d4ebdc; }
 .offerBox.off { background: var(--surface); border-color: var(--line); }
 .offerBox.stale { background: #fdf8ef; border-color: #f1e0c2; }
+/* "unknown": we never confirmed either way (pairing hasn't run for this
+   course yet) — a dashed border keeps it visually distinct from "off"
+   (confirmed not offered), so it doesn't read as a settled fact. */
+.offerBox.unknown { background: var(--surface); border-color: var(--line); border-style: dashed; }
 .offerLine {
   font-size: 13px;
   font-weight: 600;
@@ -1056,6 +1060,8 @@
 .offerDot.on { background: var(--st-available); }
 .offerDot.off { background: #9aa1ad; }
 .offerDot.stale { background: var(--st-one); }
+/* hollow dot = unverified, as opposed to a filled dot for any confirmed state */
+.offerDot.unknown { background: transparent; border: 1.5px solid #9aa1ad; }
 .offerDetail {
   font-size: 12px;
   color: var(--muted);

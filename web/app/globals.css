@@ -1372,6 +1372,8 @@ a {
 .offering-dot.on { background: #16a34a; }
 .offering-dot.off { background: #9ca3af; }
 .offering-dot.stale { background: #f59e0b; }
+/* hollow dot = never confirmed, as opposed to a filled dot for any confirmed state */
+.offering-dot.unknown { background: transparent; border: 1.5px solid #9ca3af; }
 
 .offering-detail {
   font-size: 12px;

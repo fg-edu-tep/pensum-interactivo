@@ -213,29 +213,58 @@ export default function SidePanel({
           />
         )}
 
-        {!course.isPlaceholder && (
-          <div className={styles.offerBox + " " + (offering?.syncFailed ? styles.stale : offering?.offered ? styles.on : styles.off)}>
-            <div className={styles.offerLine}>
-              <span className={`${styles.offerDot} ${offering?.syncFailed ? styles.stale : offering?.offered ? styles.on : styles.off}`} />
-              {offering?.syncFailed
-                ? "Sin datos de oferta"
-                : offering?.offered
-                  ? `Se dicta este periodo · ${term}`
-                  : `No se dicta en ${term}`}
-            </div>
-            {offering?.offered && (
-              <div className={styles.offerDetail}>
-                {offering.sectionCount} sección(es)
-                {seatsText(offering.seatsAvailable)}
+        {!course.isPlaceholder && (() => {
+          // `offering === undefined` means pairing never ran/confirmed anything
+          // for this course — that's a different, honest state from "we asked
+          // the live API and it said zero sections this term" (offered: false).
+          // Conflating them used to render both as the same grey "No se dicta"
+          // box, which is a lie for the former case.
+          const offerState: "offered" | "not_offered" | "unknown" | "sync_failed" =
+            offering === undefined
+              ? "unknown"
+              : offering.syncFailed
+                ? "sync_failed"
+                : offering.offered
+                  ? "offered"
+                  : "not_offered";
+          const styleKey =
+            offerState === "sync_failed" ? styles.stale
+              : offerState === "offered" ? styles.on
+                : offerState === "unknown" ? styles.unknown
+                  : styles.off;
+          const label =
+            offerState === "sync_failed"
+              ? "Sin datos de oferta"
+              : offerState === "offered"
+                ? `Se dicta este periodo · ${term}`
+                : offerState === "unknown"
+                  ? "Sin verificar en la oferta en línea"
+                  : `No se dicta en ${term}`;
+          return (
+            <div className={`${styles.offerBox} ${styleKey}`}>
+              <div className={styles.offerLine}>
+                <span className={`${styles.offerDot} ${styleKey}`} />
+                {label}
               </div>
-            )}
-            {link && (
-              <a href={link} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 8, fontSize: 12, fontWeight: 600, color: "var(--accent)" }}>
-                Ver secciones en Mi Horario <ExternalIcon size={12} />
-              </a>
-            )}
-          </div>
-        )}
+              {offerState === "offered" && (
+                <div className={styles.offerDetail}>
+                  {offering!.sectionCount} sección(es)
+                  {seatsText(offering!.seatsAvailable)}
+                </div>
+              )}
+              {offerState === "unknown" && (
+                <div className={styles.offerDetail}>
+                  No pudimos confirmar si se dicta este periodo — revisa directamente.
+                </div>
+              )}
+              {link && (
+                <a href={link} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 8, fontSize: 12, fontWeight: 600, color: "var(--accent)" }}>
+                  Ver secciones en Mi Horario <ExternalIcon size={12} />
+                </a>
+              )}
+            </div>
+          );
+        })()}
 
         {!course.isPlaceholder && (
           <div className={styles.sectionGap}>
