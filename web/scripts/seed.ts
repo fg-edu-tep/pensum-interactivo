@@ -24,6 +24,7 @@ import { rulesForSlug } from "../lib/catalogRules";
 import { requirementNodesForSlug } from "../lib/requirementNodes";
 import { OfferingsCache } from "../lib/pairing/offeringsCache";
 import { prisma, applySqlitePragmas } from "../lib/db";
+import { resolveOfferingTerm } from "../lib/termResolve";
 
 function findFile(dir: string, re: RegExp): string {
   const hits = readdirSync(dir).filter((f) => re.test(f));
@@ -44,7 +45,11 @@ function findFile(dir: string, re: RegExp): string {
 
 async function main() {
   const seedDir = resolve(process.cwd(), process.env.SEED_DIR ?? "..");
-  const term = process.env.OFFERINGS_TERM ?? "202620";
+  const resolved = await resolveOfferingTerm();
+  const term = resolved.term;
+  if (resolved.source !== "env" && term !== resolved.dateTerm) {
+    console.warn(`  ! API offering term ${term} differs from the calendar's ${resolved.dateTerm} (next term's registration is probably open).`);
+  }
   const pair = process.env.SEED_SKIP_PAIRING !== "1";
   const fetchDetails = pair && process.env.SEED_SKIP_DETAILS !== "1";
   // A plain re-seed is now non-destructive: it will NOT overwrite Catalog.rules /
@@ -62,7 +67,7 @@ async function main() {
   console.log(`pensum   : ${pensumPath}`);
   console.log(`prereqs  : ${prereqPath}`);
   console.log(
-    `term     : ${term}   pairing: ${pair ? "on" : "off"}   courseDetails: ${
+    `term     : ${term} (${resolved.source})   pairing: ${pair ? "on" : "off"}   courseDetails: ${
       fetchDetails ? "on" : "off"
     }`
   );

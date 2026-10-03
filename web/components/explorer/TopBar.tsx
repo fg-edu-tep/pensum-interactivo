@@ -27,7 +27,6 @@ interface Props {
   onHelp: () => void;
   onShare: () => void;
   shareFeedback: string | null;
-  tourTargetMode?: boolean;
 }
 
 export default function TopBar({
@@ -45,7 +44,6 @@ export default function TopBar({
   onHelp,
   onShare,
   shareFeedback,
-  tourTargetMode,
 }: Props) {
   const [planOpen, setPlanOpen] = useState(false);
   const planRef = useRef<HTMLDivElement>(null);
@@ -119,7 +117,7 @@ export default function TopBar({
         className={styles.modeToggle}
         role="group"
         aria-label="Modo"
-        data-tour-target={tourTargetMode ? "true" : undefined}
+        data-tour="mode"
       >
         <button
           type="button"
@@ -141,7 +139,7 @@ export default function TopBar({
 
       <div className={styles.spacer} />
 
-      <div className={styles.searchField}>
+      <div className={styles.searchField} data-tour="search">
         <span className={styles.searchIcon}>
           <SearchIcon />
         </span>
@@ -156,7 +154,7 @@ export default function TopBar({
       </div>
 
       {attestations.length > 0 && (
-        <button type="button" className={styles.accentGhost} onClick={onOpenGrado}>
+        <button type="button" className={styles.accentGhost} onClick={onOpenGrado} data-tour="grado">
           Checklist de grado <span className={styles.counterPill}>{metCount}/{attestations.length}</span>
         </button>
       )}
@@ -164,13 +162,9 @@ export default function TopBar({
       <button type="button" className={styles.iconBtn} onClick={onHelp} aria-label="Ver guía de uso" title="Ver guía de uso">
         <HelpIcon />
       </button>
-      <button type="button" className={styles.iconBtn} onClick={onShare} aria-label="Compartir" title={shareFeedback ?? "Compartir"}>
+      <button type="button" className={styles.iconBtn} onClick={onShare} data-tour="share" aria-label="Compartir" title={shareFeedback ?? "Compartir"}>
         <ShareIcon />
       </button>
-
-      <Link href={`/v1/p/${slug}`} className={styles.versionLink} title="Comparar con el diseño anterior">
-        Ver v1
-      </Link>
     </div>
   );
 }

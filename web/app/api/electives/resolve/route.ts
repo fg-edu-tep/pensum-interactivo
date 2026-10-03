@@ -8,6 +8,7 @@
 //   502 { error }                                          API unavailable
 
 import { NextResponse } from "next/server";
+import { resolveOfferingTerm } from "@/lib/termResolve";
 import { fetchSections, urlByPrefix, sectionCode } from "@/lib/shared-oferta/fetcher";
 import { tokenSetRatio } from "@/lib/import/textMatch";
 import type { SeccionAPI } from "@/lib/shared-oferta/ofertaDeCursosAPI";
@@ -26,7 +27,7 @@ function num(v: unknown): number {
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const q = (searchParams.get("q") ?? "").trim();
-  const term = (searchParams.get("term") ?? process.env.OFFERINGS_TERM ?? "202620").trim();
+  const term = (searchParams.get("term") ?? (await resolveOfferingTerm()).term).trim();
   if (!q) return NextResponse.json({ error: "missing q" }, { status: 400 });
 
   let rows: SeccionAPI[] = [];

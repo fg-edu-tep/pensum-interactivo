@@ -4,6 +4,7 @@
 // from the stored prereq/coreq trees.
 
 import { prisma } from "./db";
+import { termLabel } from "./term";
 import type {
   CatalogPayload,
   CatalogRules,
@@ -25,6 +26,16 @@ function safeRe(src: string | null | undefined): RegExp | null {
   }
 }
 import { collectCourseCodes } from "./import/requirementParser";
+
+/** codes that appear ONLY with a trailing "*" in the tree (never as a hard leaf) */
+function softOnlyCodes(node: ReqNode | null, hard = new Set<string>(), soft = new Set<string>()) {
+  if (!node) return soft;
+  if (node.op === "COURSE") {
+    if (node.code) (node.soft ? soft : hard).add(node.code);
+  } else for (const it of node.items ?? []) softOnlyCodes(it, hard, soft);
+  for (const h of hard) soft.delete(h);
+  return soft;
+}
 import { normalizeCode } from "./import/normalizeCode";
 
 function placeholderId(kind: string | null, semester: number, n: number): string {
@@ -115,6 +126,10 @@ export async function buildCatalogPayload(slug: string): Promise<CatalogPayload 
       .map((c) => idByCode.get(c)!)
       .filter(Boolean);
     const prereqExternal = allPrereq.filter((c) => !catalogCodes.has(c));
+    const concurrentPrereqIds = [...softOnlyCodes(prereqTree)]
+      .filter((c) => catalogCodes.has(c))
+      .map((c) => idByCode.get(c)!)
+      .filter(Boolean);
 
     const allCoreq = [...collectCourseCodes(coreqTree)];
     const coreqCourseIds = allCoreq
@@ -139,6 +154,7 @@ export async function buildCatalogPayload(slug: string): Promise<CatalogPayload 
       coreqText: cc.coreqText ?? "",
       prereqTree,
       prereqCourseIds,
+      concurrentPrereqIds,
       prereqExternal,
       coreqTree,
       coreqCourseIds,
@@ -262,7 +278,7 @@ export async function buildCatalogPayload(slug: string): Promise<CatalogPayload 
     program: {
       code: catalog.programCode,
       name: catalog.programName,
-      catalogLabel: [catalog.variantLabel, `CBU3 · ${catalog.term}`].filter(Boolean).join(" · "),
+      catalogLabel: [catalog.variantLabel, `CBU3 · ${termLabel(catalog.term)}`].filter(Boolean).join(" · "),
     },
     courses,
     offerings,

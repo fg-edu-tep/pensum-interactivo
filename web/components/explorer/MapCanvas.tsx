@@ -17,6 +17,7 @@ import { upstreamOf, downstreamOf, unlockRelation } from "@/lib/availability";
 import { numberRequirementGroups } from "./reqGroups";
 import { toSentenceCase } from "./format";
 import CourseCard, { type RelationState } from "./CourseCard";
+import RelationToggles, { deriveUnlockView, type RelView } from "./UnlockViewControl";
 import { PlusIcon, MinusIcon, FitIcon } from "./icons";
 import styles from "./explorer.module.css";
 
@@ -29,11 +30,34 @@ const BAND_HEADER_H = 52;
 const INSET_X = 20;
 const INSET_TOP = 16;
 
-const PREREQ_COLOR = "#1f6fc4";
-const CHAIN_COLOR = "#8fb1dd";
-const COREQ_COLOR = "#d97706";
-const UNLOCK_SOLE_COLOR = "#16a34a";
-const UNLOCK_AMONG_COLOR = "#d97706";
+// Edge colours are SVG props, so they can't be `var()`s — read the tokens
+// (tokens.css) at runtime instead of hard-coding literals. The defaults only
+// cover the first server render.
+const EDGE_DEFAULTS = {
+  PREREQ_COLOR: "#1f6fc4",
+  CHAIN_COLOR: "#8fb1dd",
+  COREQ_COLOR: "#b45309",
+  UNLOCK_SOLE_COLOR: "#15803d",
+  UNLOCK_AMONG_COLOR: "#b45309",
+};
+function useEdgeColors() {
+  const [colors, setColors] = useState(EDGE_DEFAULTS);
+  useEffect(() => {
+    const cs = getComputedStyle(document.documentElement);
+    const v = (name: string, fallback: string) => cs.getPropertyValue(name).trim() || fallback;
+    setColors({
+      PREREQ_COLOR: v("--edge-prereq", EDGE_DEFAULTS.PREREQ_COLOR),
+      CHAIN_COLOR: v("--accent-soft", EDGE_DEFAULTS.CHAIN_COLOR),
+      COREQ_COLOR: v("--edge-coreq", EDGE_DEFAULTS.COREQ_COLOR),
+      UNLOCK_SOLE_COLOR: v("--st-ok", EDGE_DEFAULTS.UNLOCK_SOLE_COLOR),
+      UNLOCK_AMONG_COLOR: v("--st-warn", EDGE_DEFAULTS.UNLOCK_AMONG_COLOR),
+    });
+  }, []);
+  return colors;
+}
+
+const EMPTY_SET: Set<string> = new Set();
+const EMPTY_MAP: Map<string, RelationState> = new Map();
 
 const ROMAN = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV"];
 const toRoman = (n: number) => ROMAN[n] ?? String(n);
@@ -120,8 +144,10 @@ interface Props {
   justUnlockedIds: Set<string>;
   quickMode: boolean;
   relaciones: RelacionesMode;
+  /** which relations to draw around the selected course (forward ones are opt-in) */
+  view: RelView;
+  onViewChange: (v: RelView) => void;
   panelOpen: boolean;
-  tourAnchorId?: string | null;
   onSelect: (id: string) => void;
   onHover: (id: string | null) => void;
 }
@@ -139,11 +165,15 @@ export default function MapCanvas({
   justUnlockedIds,
   quickMode,
   relaciones,
+  view,
+  onViewChange,
   panelOpen,
-  tourAnchorId = null,
   onSelect,
   onHover,
 }: Props) {
+  const { PREREQ_COLOR, CHAIN_COLOR, COREQ_COLOR, UNLOCK_SOLE_COLOR, UNLOCK_AMONG_COLOR } = useEdgeColors();
+  const unlockView = deriveUnlockView(view);
+  const showNeeds = view.needs;
   const catalogCodes = useMemo(() => new Set(courses.map((c) => c.codeNormalized)), [courses]);
   const byId = useMemo(() => new Map(courses.map((c) => [c.id, c])), [courses]);
 
@@ -162,24 +192,31 @@ export default function MapCanvas({
   // highlight commit so only a brief pause on a card triggers it; clearing
   // still happens immediately so a stale highlight never lingers.
   const focusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Read hover/selection through refs so `handleHover` keeps a stable identity —
+  // it's passed into every card's data, and a new identity on each hover commit
+  // would re-render all of them.
+  const hoveredRef = useRef(hoveredId);
+  const selectedRef = useRef(selectedId);
+  hoveredRef.current = hoveredId;
+  selectedRef.current = selectedId;
   const handleHover = useCallback(
     (id: string | null, rect?: DOMRect) => {
       if (focusTimer.current) clearTimeout(focusTimer.current);
       if (id === null) {
-        if (hoveredId !== null) onHover(null);
+        if (hoveredRef.current !== null) onHover(null);
       } else {
         focusTimer.current = setTimeout(() => {
-          if (id !== hoveredId) onHover(id);
+          if (id !== hoveredRef.current) onHover(id);
         }, 70);
       }
       if (hoverTimer.current) clearTimeout(hoverTimer.current);
-      if (id && rect && !selectedId) {
+      if (id && rect && !selectedRef.current) {
         hoverTimer.current = setTimeout(() => setHoverRect(rect), 250);
       } else {
         setHoverRect(null);
       }
     },
-    [onHover, selectedId, hoveredId]
+    [onHover]
   );
   useEffect(
     () => () => {
@@ -220,6 +257,28 @@ export default function MapCanvas({
     }
     return set;
   }, [courses, focusCourse]);
+
+  // The cards only care about the SELECTED course's relations. Hover feeds the
+  // edge preview + tooltip above, but must not touch these (a changed set
+  // identity rebuilds every card's data). With no selection they collapse to
+  // one shared constant so the nodes memo below stays put while hovering.
+  // What the user asked to SEE of the forward direction. "off" hides every
+  // dependent — ring, edge and un-dimming; "sole" keeps only the dependents this
+  // course unlocks BY ITSELF; "all" shows every dependent plus the whole chain.
+  const unlockShown = useMemo(() => {
+    if (unlockView === "off") return EMPTY_MAP;
+    if (unlockView === "all") return unlockById;
+    const m = new Map<string, RelationState>();
+    for (const [id, rel] of unlockById) if (rel === "unlockSole") m.set(id, rel);
+    return m;
+  }, [unlockView, unlockById]);
+  const downstreamShown = useMemo(() => (unlockView === "all" ? downstream : EMPTY_SET), [unlockView, downstream]);
+
+  const selUpstream = useMemo(() => (selectedId ? upstreamAll : EMPTY_SET), [selectedId, upstreamAll]);
+  const selDownstream = useMemo(() => (selectedId ? downstreamShown : EMPTY_SET), [selectedId, downstreamShown]);
+  const selDirectAncestors = useMemo(() => (selectedId ? directAncestors : EMPTY_SET), [selectedId, directAncestors]);
+  const selUnlockById = useMemo(() => (selectedId ? unlockShown : EMPTY_MAP), [selectedId, unlockShown]);
+  const selCoreqNeighbors = useMemo(() => (selectedId ? coreqNeighbors : EMPTY_SET), [selectedId, coreqNeighbors]);
 
   // requirement numbers for the SELECTED course's direct ancestors (CARD-07/08)
   const reqNumberByCourseId = useMemo(() => {
@@ -287,27 +346,24 @@ export default function MapCanvas({
 
     for (const semester of semesters) {
       bySemester.get(semester)!.forEach((course, row) => {
-        // Full relation styling + map-wide dimming only kick in on a real
-        // SELECTION. Pure hover (nothing selected) is a much lighter touch —
-        // just a ring on the hovered card itself (§6.3 "Hovered (no
-        // selection)") plus preview edges — otherwise moving the mouse
-        // across the grid dims/undims dozens of cards on every card and
-        // reads as flicker.
+        // Relation styling + map-wide dimming only depend on the SELECTION.
+        // Hover never reaches the nodes: the hovered ring is plain CSS
+        // (`.card:hover`) and the preview edges are built separately, so
+        // sweeping the cursor never rebuilds a card.
         const inFocusSet =
           course.id === selectedId ||
-          (relaciones === "cadena" ? upstreamAll.has(course.id) : directAncestors.has(course.id)) ||
-          downstream.has(course.id) ||
-          unlockById.has(course.id) ||
-          coreqNeighbors.has(course.id);
+          (showNeeds && (relaciones === "cadena" ? selUpstream.has(course.id) : selDirectAncestors.has(course.id))) ||
+          selDownstream.has(course.id) ||
+          selUnlockById.has(course.id) ||
+          selCoreqNeighbors.has(course.id);
 
         let relation: RelationState = null;
         if (selectedId) {
           if (course.id === selectedId) relation = "selected";
-          else if (unlockById.has(course.id)) relation = unlockById.get(course.id)!;
-          else if (directAncestors.has(course.id)) relation = "directPrereq";
-          else if (relaciones === "cadena" && upstreamAll.has(course.id)) relation = "chainIndirectFull";
-        } else if (course.id === hoveredId) {
-          relation = "hovered";
+          else if (selUnlockById.has(course.id)) relation = selUnlockById.get(course.id)!;
+          else if (showNeeds && selDirectAncestors.has(course.id)) relation = "directPrereq";
+          else if (showNeeds && relaciones === "cadena" && selUpstream.has(course.id)) relation = "chainIndirectFull";
+          else if (selDownstream.has(course.id)) relation = "downstream";
         }
 
         const isDimmed =
@@ -326,11 +382,10 @@ export default function MapCanvas({
             isPlanned: plannedIds.has(course.id),
             plannedTerm: plannedIds.get(course.id) ?? null,
             relation: quickMode ? null : relation,
-            reqNumber: selectedId ? reqNumberByCourseId.get(course.id) ?? null : null,
+            reqNumber: selectedId && showNeeds ? reqNumberByCourseId.get(course.id) ?? null : null,
             isStaged: stagedIds.has(course.id),
             isJustUnlocked: justUnlockedIds.has(course.id),
             isDimmed,
-            isTourAnchor: tourAnchorId === course.id,
             onClick: onSelect,
             onHover: handleHover,
           },
@@ -343,15 +398,14 @@ export default function MapCanvas({
   }, [
     courses,
     mode,
-    focusId,
     selectedId,
-    hoveredId,
+    showNeeds,
     relaciones,
-    upstreamAll,
-    downstream,
-    directAncestors,
-    unlockById,
-    coreqNeighbors,
+    selUpstream,
+    selDownstream,
+    selDirectAncestors,
+    selUnlockById,
+    selCoreqNeighbors,
     matchedIds,
     statusById,
     lockedIds,
@@ -360,7 +414,6 @@ export default function MapCanvas({
     justUnlockedIds,
     quickMode,
     reqNumberByCourseId,
-    tourAnchorId,
     onSelect,
     handleHover,
   ]);
@@ -373,15 +426,32 @@ export default function MapCanvas({
     const isHoverPreview = !selectedId;
     const ancestorSet = !isHoverPreview && relaciones === "cadena" ? upstreamAll : directAncestors;
     const inAncestorEdges = (id: string) => id === focusId || ancestorSet.has(id);
+    const inForward = (id: string) => id === focusId || downstream.has(id);
 
     const out: Edge[] = [];
     for (const c of courses) {
       for (const prereqId of c.prereqCourseIds) {
-        const touchesFocus = c.id === focusId || prereqId === focusId;
-        const withinChain = !isHoverPreview && relaciones === "cadena" && inAncestorEdges(c.id) && inAncestorEdges(prereqId);
-        if (!touchesFocus && !withinChain) continue;
+        // forward edges (focus -> dependent) only exist for what the user asked
+        // to see; upstream edges (prerequisites of the focus) always do
+        const forwardShown = prereqId === focusId && unlockShown.has(c.id);
+        const touchesFocus = (showNeeds && c.id === focusId) || forwardShown;
+        const withinChain = showNeeds && !isHoverPreview && relaciones === "cadena" && inAncestorEdges(c.id) && inAncestorEdges(prereqId);
+        const withinForward = !isHoverPreview && unlockView === "all" && inForward(c.id) && inForward(prereqId);
+        if (!touchesFocus && !withinChain && !withinForward) continue;
 
         const isDirect = prereqId === focusId || c.id === focusId;
+        // "*" prerequisites (can be taken the same term) read as corequisites:
+        // dashed amber, no arrowhead — same as a real coreq edge.
+        if (c.concurrentPrereqIds?.includes(prereqId)) {
+          out.push({
+            id: `${prereqId}->${c.id}`,
+            source: prereqId,
+            target: c.id,
+            type: "smoothstep",
+            style: { stroke: COREQ_COLOR, strokeDasharray: "4 3", strokeWidth: 2 },
+          });
+          continue;
+        }
         if (isHoverPreview) {
           out.push({
             id: `${prereqId}->${c.id}`,
@@ -393,7 +463,7 @@ export default function MapCanvas({
           });
           continue;
         }
-        const unlockRel = prereqId === focusId ? unlockById.get(c.id) : null;
+        const unlockRel = prereqId === focusId ? unlockShown.get(c.id) : null;
         const color = unlockRel === "unlockSole" ? UNLOCK_SOLE_COLOR : unlockRel === "unlockAmong" ? UNLOCK_AMONG_COLOR : isDirect ? PREREQ_COLOR : CHAIN_COLOR;
         out.push({
           id: `${prereqId}->${c.id}`,
@@ -416,27 +486,25 @@ export default function MapCanvas({
       }
     }
     return out;
-  }, [courses, focusId, selectedId, relaciones, upstreamAll, directAncestors, unlockById]);
+  }, [courses, focusId, selectedId, showNeeds, relaciones, unlockView, upstreamAll, downstream, directAncestors, unlockShown, PREREQ_COLOR, CHAIN_COLOR, COREQ_COLOR, UNLOCK_SOLE_COLOR, UNLOCK_AMONG_COLOR]);
 
-  const [selectionSummary, setSelectionSummary] = useState("");
-  useEffect(() => {
-    if (!selected) {
-      setSelectionSummary("");
-      return;
-    }
-    const directCount = selected.prereqCourseIds.length;
-    const unlockCount = [...unlockById.values()].filter(Boolean).length;
-    if (relaciones === "directas") {
-      setSelectionSummary(
-        `${directCount} requisito${directCount === 1 ? "" : "s"} directo${directCount === 1 ? "" : "s"} · ${
-          unlockCount === 0 ? "nada depende de ella" : `desbloquea ${unlockCount}`
-        }`
-      );
-    } else {
-      const chainCount = upstreamAll.size;
-      setSelectionSummary(`${chainCount} requisito${chainCount === 1 ? "" : "s"} en la cadena · ${directCount} directo${directCount === 1 ? "" : "s"}`);
-    }
-  }, [selected, unlockById, relaciones, upstreamAll]);
+  // numbers shown next to the three relation toggles + one quiet sentence
+  const relCounts = useMemo(() => {
+    if (!selected) return { needs: 0, unlocks: 0, depends: 0 };
+    const sole = [...unlockById.values()].filter((r) => r === "unlockSole").length;
+    return {
+      needs: relaciones === "cadena" ? upstreamAll.size : selected.prereqCourseIds.length,
+      unlocks: sole,
+      depends: downstream.size,
+    };
+  }, [selected, unlockById, relaciones, upstreamAll, downstream]);
+  const relNote = !selected
+    ? ""
+    : relCounts.depends === 0
+      ? "Ningún curso del pensum depende de este."
+      : relCounts.unlocks === 0
+        ? `Por sí solo no desbloquea ninguno, pero ${relCounts.depends} curso${relCounts.depends === 1 ? "" : "s"} del pensum dependen de él.`
+        : `Aprobarlo basta para desbloquear ${relCounts.unlocks} curso${relCounts.unlocks === 1 ? "" : "s"}; ${relCounts.depends} dependen de él en total.`;
 
   // MAP-05: fade + pan-to-hidden-semester chips at each edge that's cut off.
   const semesterCount = useMemo(() => new Set(courses.map((c) => c.semester)).size, [courses]);
@@ -484,29 +552,22 @@ export default function MapCanvas({
         <Panel position="bottom-left">
           <ZoomControls />
         </Panel>
-        <Panel position="top-right" className={styles.legendPanel}>
-          <div className={styles.legendRow}>
-            <svg width="24" height="8" aria-hidden>
-              <line x1="1" y1="4" x2="18" y2="4" stroke={PREREQ_COLOR} strokeWidth="2" />
-              <path d="M18 1 L23 4 L18 7 Z" fill={PREREQ_COLOR} />
-            </svg>
-            <span>Prerrequisito</span>
-          </div>
-          <div className={styles.legendRow}>
-            <svg width="24" height="8" aria-hidden>
-              <line x1="1" y1="4" x2="23" y2="4" stroke={COREQ_COLOR} strokeWidth="2" strokeDasharray="4 3" />
-            </svg>
-            <span>Correquisito</span>
-          </div>
-        </Panel>
       </ReactFlow>
       {selected && (
-        <div className={styles.selectionBar}>
-          <span className={styles.selectionCode}>{selected.code}</span>
-          <span className={styles.selectionSummary}>{selectionSummary}</span>
-          <button className={styles.selectionClear} onClick={() => onSelect("")}>
-            Limpiar Esc
-          </button>
+        // The dock keeps clear of the lower-left controls (zoom + basket button)
+        // however wide the card gets; only the card itself takes clicks.
+        <div className={styles.selDock}>
+          <div className={styles.selCard} role="region" aria-label={`Selección: ${selected.code}`}>
+            <div className={styles.selHead}>
+              <span className={styles.selCode}>{selected.code}</span>
+              <span className={styles.selName}>{toSentenceCase(selected.name)}</span>
+              <button type="button" className={styles.selClear} onClick={() => onSelect("")}>
+                Limpiar <kbd>Esc</kbd>
+              </button>
+            </div>
+            <RelationToggles view={view} onChange={onViewChange} counts={relCounts} />
+            <p className={styles.selNote}>{relNote}</p>
+          </div>
         </div>
       )}
       {!selectedId && hoveredId && hoverRect && focusCourse && (

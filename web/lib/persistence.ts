@@ -17,8 +17,7 @@ function plannedKey(slug: string) {
   return `pensum:${slug}:plan`;
 }
 
-/** courseId -> term code ("202710"). New-design-only (§9 planner); the
- * legacy explorer never reads or writes this key. */
+/** courseId -> term code ("202710"): the basket (§9 planner). */
 export type PlannedByTerm = Record<string, string>;
 
 export function loadPlannedFromStorage(slug: string): PlannedByTerm {

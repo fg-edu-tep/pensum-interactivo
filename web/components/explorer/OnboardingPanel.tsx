@@ -54,8 +54,8 @@ export default function OnboardingPanel({
                 </div>
               ))}
               <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
-                <span style={{ width: 12, height: 12, borderRadius: 3, border: "1.5px dashed var(--t-ele)", flexShrink: 0 }} />
-                Electivas y otros espacios por definir (borde punteado)
+                <span style={{ width: 12, height: 12, borderRadius: 3, background: "var(--t-ele)", flexShrink: 0 }} />
+                Electivas y otros espacios por definir
               </div>
             </div>
           </div>

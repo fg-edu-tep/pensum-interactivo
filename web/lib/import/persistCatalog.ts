@@ -235,17 +235,36 @@ export async function persistParsedCatalog(
 
   // 4. pairing
   if (opts.pair !== false) {
+    // The DB row is authoritative: an admin may have re-bound a slot to a
+    // different course than the pensum Excel says (kept rows are not rebuilt),
+    // and pairing the Excel's code would write the WRONG course's offering onto
+    // the re-bound row. Pair with the code the row is actually bound to.
+    const boundIds = [...new Set(catalogCourses.map((cc) => cc.courseId).filter((x): x is number => x != null))];
+    const boundCodes = new Map(
+      (await prisma.course.findMany({ where: { id: { in: boundIds } }, select: { id: true, normalizedCode: true } })).map(
+        (x) => [x.id, x.normalizedCode] as const
+      )
+    );
+    // an admin may also have turned a placeholder slot into a real course
+    const isBoundReal = (c: (typeof parsed.courses)[number]) => {
+      const db = ccBySortIndex.get(c.sortIndex);
+      return !!db && !db.isPlaceholder && db.courseId != null;
+    };
+    const pairCode = (c: (typeof parsed.courses)[number]) => {
+      const db = ccBySortIndex.get(c.sortIndex);
+      return (isBoundReal(c) && db?.courseId != null ? boundCodes.get(db.courseId) : undefined) ?? c.normalizedCode;
+    };
     const pairInput: PairInputCourse[] = parsed.courses.map((c) => ({
       sortIndex: c.sortIndex,
-      normalizedCode: c.normalizedCode,
+      normalizedCode: pairCode(c),
       displayCode: c.displayCode,
       name: c.name,
       credits: c.credits,
       semester: c.semester,
-      isPlaceholder: c.isPlaceholder,
-      placeholderKind: c.placeholderKind,
-      placeholderLabel: c.placeholderLabel,
-      prereqText: (c.isPlaceholder ? undefined : prereqMap.get(c.normalizedCode)?.prereqText) ?? null,
+      isPlaceholder: isBoundReal(c) ? false : c.isPlaceholder,
+      placeholderKind: isBoundReal(c) ? undefined : c.placeholderKind,
+      placeholderLabel: isBoundReal(c) ? undefined : c.placeholderLabel,
+      prereqText: (c.isPlaceholder && !isBoundReal(c) ? undefined : prereqMap.get(pairCode(c))?.prereqText) ?? null,
     }));
 
     const result = await pairCatalog(pairInput, opts.term, {

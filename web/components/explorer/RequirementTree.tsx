@@ -29,7 +29,7 @@ export default function RequirementTree({ course, allCourses, catalogCodes, mode
     return (
       <>
         <p className={styles.reqSingle}>{renderRequirement(course.prereqTree, allCourses)}</p>
-        <p className={styles.reqFallbackNote}>Formato no reconocido — mostrando el texto original.</p>
+        <p className={styles.reqFallbackNote}>Combinación de alternativas: cumple la expresión completa.</p>
       </>
     );
   }
@@ -65,6 +65,7 @@ export default function RequirementTree({ course, allCourses, catalogCodes, mode
                 ) : (
                   <span className={styles.reqSingle}>{spaceCode(g.code)} · fuera de este pensum</span>
                 ))}
+              {g.kind === "course" && g.soft && <span className={styles.reqFallbackNote}>puede cursarse al tiempo</span>}
               {g.kind === "requirement" && <span className={styles.reqSingle}>{g.label} · requisito de grado</span>}
               {g.kind === "or" && (
                 <>

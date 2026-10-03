@@ -86,13 +86,20 @@ export function parsePrereqExport(
   const iRAtr = idx(COL.rAtributos);
 
   const map = new Map<string, PrereqRow>();
+  const bestPeriod = new Map<string, string>();
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i] as unknown[];
     // On the multi-year master export a code repeats once per term it was
     // active in, newest first — skip every row that isn't the requested term.
-    if (iPeriodo >= 0 && clean(row[iPeriodo]) !== term) continue;
+    // Courses not offered in `term` have no row for it; fall back to their
+    // most recent EARLIER period (never a later one) so their requirements
+    // still come from Registro rather than nowhere.
+    const periodo = iPeriodo >= 0 ? clean(row[iPeriodo]) : term;
+    if (periodo > term) continue;
     const code = normalizeCode(row[iMateria]);
     if (!code) continue;
+    if ((bestPeriod.get(code) ?? "") > periodo) continue;
+    bestPeriod.set(code, periodo);
     const creditsRaw = iCred >= 0 ? Number.parseFloat(String(row[iCred] ?? "").replace(",", ".")) : NaN;
     // last row wins if a code somehow repeats within the same term; that's
     // fine for our use (the master file has none, verified on iele-cbu3/ielc-cbu3)

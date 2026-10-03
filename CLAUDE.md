@@ -13,6 +13,10 @@ live pairing against the Uniandes course API). Deploys to Vercel.
 Read `PROGRESS.md` first — it lists what's done (P0 data pipeline, P1 student panel),
 what's next (P2 admin, P3 Docker), and the gotchas.
 
+- **Docs:** [`docs/`](docs/README.md) — branches & releases (the MySQL monolith on
+  `mysql-migration` is the official release; this `main`/Vercel/Neon build is a temporary
+  preview), the October 2026 design pass, user flows.
+
 ## Layout
 
 - `web/` — the Next.js app (all `npm run *` commands run **here**, not the repo root)
