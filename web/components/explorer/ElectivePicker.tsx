@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { termLabel as termShort } from "@/lib/term";
 import type {
   ElectiveAssignment,
   ElectiveDTO,
@@ -36,12 +37,6 @@ const ROLE_LABEL: Record<string, string> = {
   pasantia: "Pasantía",
   maestria: "Electiva de maestría",
 };
-
-function termShort(term: string): string {
-  const year = term.slice(0, 4);
-  const period = term.slice(4);
-  return `${year}-${period === "10" ? "1" : period === "30" ? "V" : "2"}`;
-}
 
 function narrowFromSlot(slotLabel: string): string | null {
   const s = foldAccents(slotLabel);

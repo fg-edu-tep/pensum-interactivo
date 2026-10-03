@@ -24,23 +24,31 @@ function hasCatalogLeaf(node: ReqNode, catalogCodes: Set<string>): boolean {
   return (node.items ?? []).some((it) => hasCatalogLeaf(it, catalogCodes));
 }
 
+/** Registro marks a prerequisite with a trailing `*` ("soft") when it may be
+ * taken the SAME term. `concurrentOk(code)` says whether that co-enrolment is
+ * actually possible right now (the course's own prerequisites are met); when
+ * omitted, soft codes are treated like hard ones. */
+export type ConcurrentOk = (code: string) => boolean;
+
 export function satisfied(
   node: ReqNode | null,
   approved: Set<string>,
-  catalogCodes: Set<string>
+  catalogCodes: Set<string>,
+  concurrentOk?: ConcurrentOk
 ): boolean {
   if (!node) return true;
   if (node.op === "COURSE") {
     if (!catalogCodes.has(node.code!)) return true; // out-of-catalog: informational only
-    return approved.has(node.code!);
+    if (approved.has(node.code!)) return true;
+    return !!node.soft && !!concurrentOk?.(node.code!);
   }
   const items = node.items ?? [];
-  if (node.op === "AND") return items.every((it) => satisfied(it, approved, catalogCodes));
+  if (node.op === "AND") return items.every((it) => satisfied(it, approved, catalogCodes, concurrentOk));
   // OR: ignore alternatives with no in-catalog leaf at all, unless none of
   // them have one (fully external OR, vacuously satisfied).
   const relevant = items.filter((it) => hasCatalogLeaf(it, catalogCodes));
   if (relevant.length === 0) return true;
-  return relevant.some((it) => satisfied(it, approved, catalogCodes));
+  return relevant.some((it) => satisfied(it, approved, catalogCodes, concurrentOk));
 }
 
 /** Minimal (best-effort) set of in-catalog course codes that would need to
@@ -49,29 +57,32 @@ export function satisfied(
 export function missingCodes(
   node: ReqNode | null,
   approved: Set<string>,
-  catalogCodes: Set<string>
+  catalogCodes: Set<string>,
+  concurrentOk?: ConcurrentOk
 ): Set<string> {
   if (!node) return new Set();
   if (node.op === "COURSE") {
     if (!catalogCodes.has(node.code!)) return new Set();
-    return approved.has(node.code!) ? new Set() : new Set([node.code!]);
+    if (approved.has(node.code!)) return new Set();
+    if (node.soft && concurrentOk?.(node.code!)) return new Set();
+    return new Set([node.code!]);
   }
   const items = node.items ?? [];
   if (node.op === "AND") {
     const out = new Set<string>();
     for (const item of items) {
-      if (satisfied(item, approved, catalogCodes)) continue;
-      for (const c of missingCodes(item, approved, catalogCodes)) out.add(c);
+      if (satisfied(item, approved, catalogCodes, concurrentOk)) continue;
+      for (const c of missingCodes(item, approved, catalogCodes, concurrentOk)) out.add(c);
     }
     return out;
   }
   // OR
   const relevant = items.filter((it) => hasCatalogLeaf(it, catalogCodes));
   if (relevant.length === 0) return new Set();
-  if (relevant.some((it) => satisfied(it, approved, catalogCodes))) return new Set();
+  if (relevant.some((it) => satisfied(it, approved, catalogCodes, concurrentOk))) return new Set();
   let best: Set<string> | null = null;
   for (const item of relevant) {
-    const m = missingCodes(item, approved, catalogCodes);
+    const m = missingCodes(item, approved, catalogCodes, concurrentOk);
     if (!best || m.size < best.size) best = m;
   }
   return best ?? new Set();
@@ -224,10 +235,20 @@ export function courseAvailability(
     return { status: "blocked", missing: [], coreqBlockers: [], gateReasons };
   }
 
-  const prereqOk = satisfied(course.prereqTree, approved, catalogCodes);
+  // A soft ("*") prerequisite can be co-enrolled, but only if that course is
+  // itself takeable this term (its own hard prerequisites met).
+  const byCode = allCourses ? new Map(allCourses.map((c) => [c.codeNormalized, c])) : null;
+  const concurrentOk: ConcurrentOk | undefined = byCode
+    ? (code) => {
+        const co = byCode.get(code);
+        return !!co && co.id !== course.id && satisfied(co.prereqTree, approved, catalogCodes);
+      }
+    : undefined;
+
+  const prereqOk = satisfied(course.prereqTree, approved, catalogCodes, concurrentOk);
   const missing = prereqOk
     ? []
-    : [...missingCodes(course.prereqTree, approved, catalogCodes)];
+    : [...missingCodes(course.prereqTree, approved, catalogCodes, concurrentOk)];
 
   // A coreq is fine if it's already approved, or if it could be co-enrolled
   // this term (its own prerequisites are met).

@@ -1,0 +1,233 @@
+{
+  "schemaVersion": "1.0",
+  "program": {
+    "code": "M-MAIA",
+    "name": "Maestría en Inteligencia Artificial",
+    "level": "maestria",
+    "totalCredits": 36,
+    "catalogYearStart": "202320"
+  },
+  "areas": [
+    {
+      "id": "d349ea05-22ff-38fa-f17f-1e7477e8f332",
+      "name": "Fundamentos - Master Track",
+      "targetCredits": 9
+    },
+    {
+      "id": "owaJxP8yXrk_IUOx32Nzj",
+      "name": "Profundización",
+      "targetCredits": 9
+    },
+    {
+      "id": "b_NCRStdBe_pojWbf4LXk",
+      "name": "Electivas",
+      "targetCredits": 12
+    },
+    {
+      "id": "eKEF3J7DMfd0r4_1AA-Q4",
+      "name": "Proyectos",
+      "targetCredits": 6
+    }
+  ],
+  "rules": [
+    {
+      "id": "A2w0Hfls1AqUHnB0x0qpi",
+      "area": "d349ea05-22ff-38fa-f17f-1e7477e8f332",
+      "code": "YCXHNM",
+      "term": 1,
+      "type": "course",
+      "credits": 3,
+      "options": [
+        {
+          "title": "INTR. INTELIG. ARTIF. CONTEMP.",
+          "number": "4100",
+          "credits": 3,
+          "subject": "MAIA"
+        }
+      ]
+    },
+    {
+      "id": "iE_XUEiFblQIO7FqtUQGh",
+      "area": "d349ea05-22ff-38fa-f17f-1e7477e8f332",
+      "code": "QZTPWQ",
+      "term": 1,
+      "type": "course",
+      "credits": 2,
+      "options": [
+        {
+          "title": "PRINCIPIOS DE MACHINE LEARNING",
+          "number": "4110",
+          "credits": 2,
+          "subject": "MAIA"
+        }
+      ]
+    },
+    {
+      "id": "KZChO4Lu8lDlsCf0xblJU",
+      "area": "d349ea05-22ff-38fa-f17f-1e7477e8f332",
+      "code": "6458PZ",
+      "term": 1,
+      "type": "course",
+      "credits": 2,
+      "options": [
+        {
+          "title": "ÉTICA DE LA INTEL. ARTIFICIAL",
+          "number": "4101",
+          "credits": 2,
+          "subject": "MAIA"
+        }
+      ]
+    },
+    {
+      "id": "S-brFvQITGASN_P_c0xwD",
+      "area": "d349ea05-22ff-38fa-f17f-1e7477e8f332",
+      "code": "D44VB2",
+      "term": 1,
+      "type": "course",
+      "credits": 2,
+      "options": [
+        {
+          "title": "MATEMAT. PARA MACHINE LEARNING",
+          "number": "4111",
+          "credits": 2,
+          "subject": "MAIA"
+        }
+      ]
+    },
+    {
+      "id": "qXO57-TcAL4lr5Q5HK6Sj",
+      "area": "owaJxP8yXrk_IUOx32Nzj",
+      "code": "KTZ7BF",
+      "term": 2,
+      "type": "course",
+      "credits": 2,
+      "options": [
+        {
+          "title": "MACHINE LEARNING SUPERVISADO",
+          "number": "4210",
+          "credits": 2,
+          "subject": "MAIA"
+        }
+      ]
+    },
+    {
+      "id": "2ZgpShy86sCj2LntaSR5n",
+      "area": "owaJxP8yXrk_IUOx32Nzj",
+      "code": "P7AWMA",
+      "term": 2,
+      "type": "course",
+      "credits": 2,
+      "options": [
+        {
+          "title": "MACHINE LEARNING NO SUPERVISAD",
+          "number": "4211",
+          "credits": 2,
+          "subject": "MAIA"
+        }
+      ]
+    },
+    {
+      "id": "y1_D_WRS6GVydA2xGs8Yg",
+      "area": "owaJxP8yXrk_IUOx32Nzj",
+      "code": "U6KNY4",
+      "term": 2,
+      "type": "course",
+      "credits": 2,
+      "options": [
+        {
+          "title": "APRENDIZAJE POR REFUERZO",
+          "number": "4212",
+          "credits": 2,
+          "subject": "MAIA"
+        }
+      ]
+    },
+    {
+      "id": "hkZ25D635fmj0-ojSvg7y",
+      "area": "owaJxP8yXrk_IUOx32Nzj",
+      "code": "JBPYV5",
+      "term": 2,
+      "type": "course",
+      "credits": 3,
+      "options": [
+        {
+          "title": "TÉCNICAS DE DEEP LEARNING",
+          "number": "4213",
+          "credits": 3,
+          "subject": "MAIA"
+        }
+      ]
+    },
+    {
+      "id": "8D41kViROqbGkJxghzEPb",
+      "area": "eKEF3J7DMfd0r4_1AA-Q4",
+      "code": "DMSFD7",
+      "term": 4,
+      "type": "course",
+      "credits": 3,
+      "options": [
+        {
+          "title": "PROYECTO: DESARROLLO DE SOLUC",
+          "number": "4401",
+          "credits": 3,
+          "subject": "MAIA"
+        }
+      ]
+    },
+    {
+      "id": "NA8XjYSM-tZ41nd6amB9M",
+      "area": "eKEF3J7DMfd0r4_1AA-Q4",
+      "code": "HAZBYD",
+      "term": 4,
+      "type": "course",
+      "credits": 3,
+      "options": [
+        {
+          "title": "PROYECTO: DESPLIEGUE DE SOLUC",
+          "number": "4402",
+          "credits": 3,
+          "subject": "MAIA"
+        }
+      ]
+    },
+    {
+      "id": "FRABAf8qnJYz0L10zQq6u",
+      "max": null,
+      "min": 8,
+      "area": "b_NCRStdBe_pojWbf4LXk",
+      "code": "7NQMMV",
+      "from": [
+        "MAIA-4300:4399"
+      ],
+      "term": 3,
+      "type": "pool",
+      "unit": "credits",
+      "label": "Electivas MAIA"
+    },
+    {
+      "id": "61jyTFVICAfJpYriuDSzS",
+      "max": null,
+      "min": 4,
+      "area": "b_NCRStdBe_pojWbf4LXk",
+      "code": "GT6K4Q",
+      "from": [
+        "MAIA-4300:4399",
+        "MISW-4301",
+        "MISW-4304",
+        "MISW-4305",
+        "MISW-4411",
+        "MIID-4201",
+        "MIID-4402",
+        "MIID-4404"
+      ],
+      "term": 4,
+      "type": "pool",
+      "unit": "credits",
+      "label": "Electivas MAIA++"
+    }
+  ],
+  "provenance": {
+    "author": "Mauricio Guerrero",
+    "status": "borrador"
+  }
+}

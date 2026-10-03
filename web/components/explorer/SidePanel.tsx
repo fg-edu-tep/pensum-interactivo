@@ -8,11 +8,11 @@ import type {
   ElectiveDTO,
   OfferingBadge,
 } from "@/lib/types";
-import ElectivePicker from "@/components/legacy/ElectivePicker";
+import ElectivePicker from "./ElectivePicker";
 import ChainMiniature from "./ChainMiniature";
 import RequirementTree from "./RequirementTree";
-import { groupClass, groupColor, groupOf, spaceCode, toSentenceCase, nextTermCode, nextTermShort } from "./format";
-import { ChevronRightIcon, CloseIcon, CheckIcon, ExternalIcon } from "./icons";
+import { groupClass, groupColor, groupOf, spaceCode, toSentenceCase, nextTermCode, nextTermShort, termShort } from "./format";
+import { ChevronRightIcon, CloseIcon, CheckIcon, ExternalIcon, BasketIcon } from "./icons";
 import styles from "./explorer.module.css";
 
 const CBU_OFERTA_URL = "https://educaciongeneral.uniandes.edu.co/cbu/";
@@ -70,6 +70,7 @@ interface Props {
   chainExtraCount: number;
   approved: Set<string>;
   isPlanned: boolean;
+  plannable: boolean;
   offering: OfferingBadge | undefined;
   term: string;
   mihorarioUrl: string;
@@ -81,10 +82,10 @@ interface Props {
   onAssignElective: (slotId: string, a: ElectiveAssignment | null) => void;
   onToggleApproved: (id: string) => void;
   onTogglePlanned: (id: string, term: string | null) => void;
+  onOpenBasket: (id: string) => void;
   onSelectCourse: (id: string) => void;
   onCollapse: () => void;
   onClose: () => void;
-  tourTargetChain?: boolean;
 }
 
 export default function SidePanel({
@@ -98,6 +99,7 @@ export default function SidePanel({
   chainExtraCount,
   approved,
   isPlanned,
+  plannable,
   offering,
   term,
   mihorarioUrl,
@@ -109,10 +111,10 @@ export default function SidePanel({
   onAssignElective,
   onToggleApproved,
   onTogglePlanned,
+  onOpenBasket,
   onSelectCourse,
   onCollapse,
   onClose,
-  tourTargetChain,
 }: Props) {
   if (!course) {
     return (
@@ -173,7 +175,7 @@ export default function SidePanel({
   }
 
   return (
-    <aside className={styles.panel}>
+    <aside className={styles.panel} data-tour="panel">
       <div className={styles.panelHeader}>
         <button className={styles.panelCollapse} onClick={onCollapse} aria-label="Ocultar panel"><ChevronRightIcon /></button>
         <button className={styles.panelClose} onClick={onClose} aria-label="Cerrar"><CloseIcon /></button>
@@ -209,33 +211,61 @@ export default function SidePanel({
             mode={mode}
             approved={approved}
             onSelect={onSelectCourse}
-            tourTarget={tourTargetChain}
           />
         )}
 
-        {!course.isPlaceholder && (
-          <div className={styles.offerBox + " " + (offering?.syncFailed ? styles.stale : offering?.offered ? styles.on : styles.off)}>
-            <div className={styles.offerLine}>
-              <span className={`${styles.offerDot} ${offering?.syncFailed ? styles.stale : offering?.offered ? styles.on : styles.off}`} />
-              {offering?.syncFailed
-                ? "Sin datos de oferta"
-                : offering?.offered
-                  ? `Se dicta este periodo · ${term}`
-                  : `No se dicta en ${term}`}
-            </div>
-            {offering?.offered && (
-              <div className={styles.offerDetail}>
-                {offering.sectionCount} sección(es)
-                {seatsText(offering.seatsAvailable)}
+        {!course.isPlaceholder && (() => {
+          // `offering === undefined` means pairing never ran/confirmed anything
+          // for this course — that's a different, honest state from "we asked
+          // the live API and it said zero sections this term" (offered: false).
+          // Conflating them used to render both as the same grey "No se dicta"
+          // box, which is a lie for the former case.
+          const offerState: "offered" | "not_offered" | "unknown" | "sync_failed" =
+            offering === undefined
+              ? "unknown"
+              : offering.syncFailed
+                ? "sync_failed"
+                : offering.offered
+                  ? "offered"
+                  : "not_offered";
+          const styleKey =
+            offerState === "sync_failed" ? styles.stale
+              : offerState === "offered" ? styles.on
+                : offerState === "unknown" ? styles.unknown
+                  : styles.off;
+          const label =
+            offerState === "sync_failed"
+              ? "Sin datos de oferta"
+              : offerState === "offered"
+                ? `Se dicta este periodo · ${termShort(term)}`
+                : offerState === "unknown"
+                  ? "Sin verificar en la oferta en línea"
+                  : `No se dicta en ${termShort(term)}`;
+          return (
+            <div className={`${styles.offerBox} ${styleKey}`}>
+              <div className={styles.offerLine}>
+                <span className={`${styles.offerDot} ${styleKey}`} />
+                {label}
               </div>
-            )}
-            {link && (
-              <a href={link} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 8, fontSize: 12, fontWeight: 600, color: "var(--accent)" }}>
-                Ver secciones en Mi Horario <ExternalIcon size={12} />
-              </a>
-            )}
-          </div>
-        )}
+              {offerState === "offered" && (
+                <div className={styles.offerDetail}>
+                  {offering!.sectionCount} sección(es)
+                  {seatsText(offering!.seatsAvailable)}
+                </div>
+              )}
+              {offerState === "unknown" && (
+                <div className={styles.offerDetail}>
+                  No pudimos confirmar si se dicta este periodo — revisa directamente.
+                </div>
+              )}
+              {link && (
+                <a href={link} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 8, fontSize: 12, fontWeight: 600, color: "var(--accent)" }}>
+                  Ver secciones en Mi Horario <ExternalIcon size={12} />
+                </a>
+              )}
+            </div>
+          );
+        })()}
 
         {!course.isPlaceholder && (
           <div className={styles.sectionGap}>
@@ -314,37 +344,44 @@ export default function SidePanel({
         )}
       </div>
 
-      {!course.isPlaceholder && (
-        <div className={styles.panelFooter}>
-          {mode === "explore" ? (
-            <button className={styles.btnPrimary} onClick={() => onToggleApproved(course.id)}>
-              <CheckIcon />
-              {approved.has(course.id) ? "Desmarcar aprobada" : "Marcar aprobada"}
-            </button>
-          ) : approved.has(course.id) ? (
-            <button className={styles.btnPrimary} onClick={() => onToggleApproved(course.id)}>
-              Desmarcar
-            </button>
-          ) : status === "available" ? (
-            <button className={styles.btnPrimary} onClick={() => onTogglePlanned(course.id, isPlanned ? null : nextTermCode(term))}>
-              {isPlanned ? "Quitar del plan" : `Agregar a ${nextTermShort(term)}`}
-            </button>
-          ) : (
-            <button
-              className={styles.btnPrimary}
-              disabled={gateReasons.length > 0}
-              onClick={() => onTogglePlanned(course.id, isPlanned ? null : nextTermCode(term))}
-            >
-              {isPlanned ? "Quitar del plan" : `Planear para ${nextTermShort(term)}`}
-            </button>
-          )}
-          {link && (
-            <a href={link} target="_blank" rel="noopener noreferrer" className={styles.btnGhostFooter}>
-              Ver secciones <ExternalIcon size={13} />
-            </a>
-          )}
-        </div>
-      )}
+      <div className={styles.panelFooter}>
+        {mode === "explore" || course.isPlaceholder ? (
+          <button className={styles.btnPrimary} onClick={() => onToggleApproved(course.id)}>
+            <CheckIcon />
+            {approved.has(course.id)
+              ? mode === "explore" ? "Desmarcar aprobada" : "Desmarcar"
+              : mode === "explore" ? "Marcar aprobada" : "Marcar como vista"}
+          </button>
+        ) : approved.has(course.id) ? (
+          <button className={styles.btnPrimary} onClick={() => onToggleApproved(course.id)}>
+            Desmarcar
+          </button>
+        ) : (
+          <button
+            className={styles.btnPrimary}
+            disabled={gateReasons.length > 0 || (!isPlanned && !plannable)}
+            title={!isPlanned && !plannable ? "Aún no cumples los prerrequisitos (vistos + planeados)" : undefined}
+            onClick={() => onTogglePlanned(course.id, isPlanned ? null : nextTermCode())}
+          >
+            {!isPlanned && plannable && <BasketIcon size={15} />}
+            {isPlanned
+              ? "Quitar de la canasta"
+              : plannable
+                ? `Agregar a mi canasta · ${nextTermShort()}`
+                : "Requiere cursos previos"}
+          </button>
+        )}
+        {!course.isPlaceholder && link && (
+          <a href={link} target="_blank" rel="noopener noreferrer" className={styles.btnGhostFooter}>
+            Ver secciones <ExternalIcon size={13} />
+          </a>
+        )}
+        {isPlanned && mode === "progress" && (
+          <button type="button" className={`${styles.btnGhostFooter} ${styles.btnFullRow}`} onClick={() => onOpenBasket(course.id)}>
+            <BasketIcon size={14} /> Ver mi canasta y confirmar
+          </button>
+        )}
+      </div>
     </aside>
   );
 }

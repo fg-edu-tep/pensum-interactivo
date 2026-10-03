@@ -8,7 +8,7 @@
   --ink: #1f2430;
   --ink-2: #39404f;
   --muted: #5b6272;
-  --muted-2: #6b7280;
+  --muted-2: #646b79; /* 4.61:1 on --band-a (was 4.16) */
   --line: #e3e6eb;
   --line-soft: #eef0f3;
   --line-control: #dfe3e8;
@@ -35,11 +35,45 @@
   --t-cbu: #3d33a0;
   --t-req: #4a5568;
 
-  --st-available: #16a34a;
-  --st-one: #d97706;
-  --st-one-text: #b45309;
-  --st-admin: #d97706;
+  /* Status. ONE green, ONE amber. Ratios are white-on-fill (WCAG, text 4.5:1):
+       --st-ok   #15803d  5.02   approved fill, check marker, unlock pulse
+       --st-warn #b45309  5.02   admin-rule lock, corequisite edges
+       --st-plan = --accent  5.09   basket pill + basket header
+     (the old amber #d97706 was 3.19 — failed for text and the lock glyph) */
+  --st-ok: #15803d;
+  --st-ok-tint: color-mix(in srgb, var(--st-ok) 12%, white);
+  --st-warn: #b45309;
+  --st-plan: var(--accent);
   --st-blocked-a: #eef0f3;
   --st-blocked-b: #e3e6eb;
-  --st-planned: var(--accent);
+
+  /* legacy names, kept as aliases so older rules keep working */
+  --st-available: var(--st-ok);
+  --st-one: var(--st-warn);
+  --st-one-text: var(--st-warn);
+  --st-admin: var(--st-warn);
+  --st-planned: var(--st-plan);
+
+  /* Edges are SVG props, so MapCanvas reads these at runtime (useEdgeColors). */
+  --edge-prereq: var(--accent);
+  --edge-coreq: var(--st-warn);
+
+  /* The gap between a card and its ring/marker. Equals the surface so a ring
+     reads as "floating" on any band; becomes dark in a dark theme. */
+  --ring-gap: var(--surface);
+  --card-r: 8px;
+
+  /* Text on type fills. Primary is white (6.3–9.6:1 on every type fill).
+     Secondary (code, credits) is a SOLID colour, never opacity — opacity made
+     the ratio depend on the fill. Each is the lightest white/fill mix that still
+     clears 4.5:1 on its own fill. */
+  --on-type: #ffffff;
+  --on-type-2-iele: #cce0e1;
+  --on-type-2-cb: #dbd0bf;
+  --on-type-2-otr: #bec0c4;
+  --on-type-2-pro: #cad6f1;
+  --on-type-2-ele: #e4c0d2;
+  --on-type-2-cbu: #b1add9;
+  --on-type-2-req: #c5c9cf;
+  --on-type-2-ok: #ecf5ef;
 }

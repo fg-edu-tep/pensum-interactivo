@@ -1,0 +1,772 @@
+{
+  "schemaVersion": "1.0",
+  "program": {
+    "code": "IELC",
+    "name": "Ingeniería Electrónica",
+    "level": "pregrado",
+    "totalCredits": 134,
+    "catalogYearStart": "202410"
+  },
+  "areas": [
+    {
+      "id": "32c40c45-599c-fe4b-4284-2610c172785f",
+      "name": "Matemáticas y Ciencias Básicas",
+      "targetCredits": 32
+    },
+    {
+      "id": "g45FPu0PATNsa3JjLc-vm",
+      "name": "Fundamentos de Ingeniería",
+      "targetCredits": 9
+    },
+    {
+      "id": "qSEmgXP8SLVCNEKYS1sJd",
+      "name": "Fundamentos Transversales",
+      "targetCredits": 32
+    },
+    {
+      "id": "NOJbdvGxiV_bkxKGKhInW",
+      "name": "Fundamentos Específicos",
+      "targetCredits": 10
+    },
+    {
+      "id": "Be4KaMOVAbKflj1ark8tZ",
+      "name": "Proyectos",
+      "targetCredits": 13
+    },
+    {
+      "id": "t29D79ih0nOC-wKoXaj0j",
+      "name": "Ciclo Terminal",
+      "targetCredits": 11
+    }
+  ],
+  "rules": [
+    {
+      "id": "wAy1KbPhkiM6GafCnxVQE",
+      "area": "32c40c45-599c-fe4b-4284-2610c172785f",
+      "code": "U73SKE",
+      "term": 1,
+      "type": "course",
+      "label": "Cálculo Diferencial",
+      "credits": 3,
+      "options": [
+        {
+          "title": "Cálculo Diferencial",
+          "number": "1203",
+          "credits": 3,
+          "subject": "MATE"
+        },
+        {
+          "title": "CALCULO DIFEREN (HON)",
+          "number": "1204",
+          "credits": 3,
+          "subject": "MATE"
+        }
+      ]
+    },
+    {
+      "id": "6U9RxD08GewFRJ0wHsESS",
+      "area": "32c40c45-599c-fe4b-4284-2610c172785f",
+      "code": "45M6DB",
+      "term": 2,
+      "type": "course",
+      "label": "Cálculo Integral - Ec. Diferenciales",
+      "credits": 3,
+      "options": [
+        {
+          "title": "CÁLCULO INTEGRAL-ECUAC.DIFEREN",
+          "number": "1214",
+          "credits": 3,
+          "subject": "MATE"
+        },
+        {
+          "title": "CALCULO INT-ECUAC.DIFER(HON)",
+          "number": "1215",
+          "credits": 3,
+          "subject": "MATE"
+        }
+      ]
+    },
+    {
+      "id": "BETW-y8hBCy18DmgmE4yb",
+      "area": "32c40c45-599c-fe4b-4284-2610c172785f",
+      "code": "MKMX9Q",
+      "term": 2,
+      "type": "course",
+      "label": "Algebra Lineal",
+      "credits": 3,
+      "options": [
+        {
+          "title": "ALGEBRA LINEAL 1",
+          "number": "1105",
+          "credits": 3,
+          "subject": "MATE"
+        },
+        {
+          "title": "ALGE LINEAL1(HONORES)",
+          "number": "1106",
+          "credits": 3,
+          "subject": "MATE"
+        }
+      ]
+    },
+    {
+      "id": "VKOwOQdKsF3aA7rilvYtP",
+      "area": "32c40c45-599c-fe4b-4284-2610c172785f",
+      "code": "JD6WNP",
+      "term": 3,
+      "type": "course",
+      "label": "Cálculo Vectorial",
+      "credits": 3,
+      "options": [
+        {
+          "title": "CÁLCULO VECTORIAL",
+          "number": "1207",
+          "credits": 3,
+          "subject": "MATE"
+        },
+        {
+          "title": "CALC. VECTORIAL (HONORES)",
+          "number": "1208",
+          "credits": 3,
+          "subject": "MATE"
+        }
+      ]
+    },
+    {
+      "id": "zFqpAL2c6MB3u1HXBEa9Q",
+      "area": "32c40c45-599c-fe4b-4284-2610c172785f",
+      "code": "9VNBBS",
+      "term": 1,
+      "type": "course",
+      "label": "Variable Compleja",
+      "credits": 2,
+      "options": [
+        {
+          "title": "CALC VARIABLE COMPL (INGENIER)",
+          "number": "2210",
+          "credits": 2,
+          "subject": "MATE"
+        },
+        {
+          "title": "CÁLCULO VARIABLE COMPLEJA",
+          "number": "2211",
+          "credits": 3,
+          "subject": "MATE"
+        }
+      ]
+    },
+    {
+      "id": "hPRPLHMOqLT-uT6DcxRRK",
+      "area": "32c40c45-599c-fe4b-4284-2610c172785f",
+      "code": "CFB2R6",
+      "term": 4,
+      "type": "course",
+      "label": "Ecuaciones Diferenciales",
+      "credits": 3,
+      "options": [
+        {
+          "title": "ECUACIONES DIFERENCIALES",
+          "number": "2301",
+          "credits": 3,
+          "subject": "MATE"
+        },
+        {
+          "title": "ECUAC.DIFERENCIAL.(INGENIERÍA)",
+          "number": "2303",
+          "credits": 3,
+          "subject": "MATE"
+        }
+      ]
+    },
+    {
+      "id": "JpwPILgKrVE4xN4jXpYF6",
+      "area": "32c40c45-599c-fe4b-4284-2610c172785f",
+      "code": "TXXKFW",
+      "term": 2,
+      "type": "course",
+      "label": "Física I",
+      "credits": 3,
+      "options": [
+        {
+          "title": "FÍSICA I",
+          "number": "1518",
+          "credits": 3,
+          "subject": "FISI"
+        },
+        {
+          "title": "FÍSICA I",
+          "number": "1018",
+          "credits": 3,
+          "subject": "FISI"
+        }
+      ]
+    },
+    {
+      "id": "1WgnOOV30TeyC-oi6GZJg",
+      "area": "32c40c45-599c-fe4b-4284-2610c172785f",
+      "code": "QEFY2H",
+      "term": 3,
+      "type": "course",
+      "label": "Física II",
+      "credits": 3,
+      "options": [
+        {
+          "title": "FÍSICA II",
+          "number": "1528",
+          "credits": 3,
+          "subject": "FISI"
+        },
+        {
+          "title": "FÍSICA II",
+          "number": "1028",
+          "credits": 3,
+          "subject": "FISI"
+        }
+      ]
+    },
+    {
+      "id": "Z8JzdOXuDfOaIqyUol7zo",
+      "area": "32c40c45-599c-fe4b-4284-2610c172785f",
+      "code": "S4MNUH",
+      "term": 4,
+      "type": "course",
+      "credits": 3,
+      "options": [
+        {
+          "title": "PROBABILIDAD Y ESTADÍSTICA I",
+          "number": "2106",
+          "credits": 3,
+          "subject": "IIND"
+        }
+      ]
+    },
+    {
+      "id": "ilynESkSgfuZX7ptHreNN",
+      "area": "32c40c45-599c-fe4b-4284-2610c172785f",
+      "code": "KAYG4Z",
+      "term": 5,
+      "type": "course",
+      "credits": 3,
+      "options": [
+        {
+          "title": "MATERIALES PARA IEE",
+          "number": "2010",
+          "credits": 3,
+          "subject": "IELE"
+        }
+      ]
+    },
+    {
+      "id": "Xom15q3Ibxx6WfLW8-aVQ",
+      "area": "32c40c45-599c-fe4b-4284-2610c172785f",
+      "code": "2GJ7GC",
+      "term": 6,
+      "type": "course",
+      "label": "Optimización",
+      "credits": 3,
+      "options": [
+        {
+          "title": "OPTIMIZACIÓN",
+          "number": "3006",
+          "credits": 3,
+          "subject": "IELE"
+        },
+        {
+          "title": "OPTIMIZACIÓN",
+          "number": "4011",
+          "credits": 4,
+          "subject": "IELE"
+        }
+      ]
+    },
+    {
+      "id": "LS01nVBL91f6sQTNadMm5",
+      "area": "g45FPu0PATNsa3JjLc-vm",
+      "code": "6TYYQ4",
+      "term": 1,
+      "type": "course",
+      "credits": 3,
+      "options": [
+        {
+          "title": "Introducción a la Programación",
+          "number": "1221",
+          "credits": 3,
+          "subject": "ISIS"
+        }
+      ]
+    },
+    {
+      "id": "pUyZznrsG7x9FXfh5y6Ro",
+      "area": "g45FPu0PATNsa3JjLc-vm",
+      "code": "JQFYRS",
+      "term": 5,
+      "type": "course",
+      "credits": 3,
+      "options": [
+        {
+          "title": "ANALIS.DECISIÓN INVERSIÓN",
+          "number": "2401",
+          "credits": 3,
+          "subject": "IIND"
+        }
+      ]
+    },
+    {
+      "id": "uEduHIqUFPzigIgHyDnLL",
+      "max": null,
+      "min": 3,
+      "area": "g45FPu0PATNsa3JjLc-vm",
+      "code": "VPHU8X",
+      "from": [
+        "IIND-@",
+        "IQYA-@",
+        "IMEC-@",
+        "IBIO-@",
+        "ICYA-@"
+      ],
+      "term": 3,
+      "type": "pool",
+      "unit": "credits",
+      "label": "Electiva en Fundamentos de Ingeniería"
+    },
+    {
+      "id": "x1j0Wc_XRixAbuKK6Tzq9",
+      "area": "qSEmgXP8SLVCNEKYS1sJd",
+      "code": "N4CDC4",
+      "term": 2,
+      "type": "course",
+      "credits": 2,
+      "options": [
+        {
+          "title": "FUNDAMENTOS SISTEMAS DIGITALES",
+          "number": "1200",
+          "credits": 3,
+          "subject": "IELE"
+        }
+      ]
+    },
+    {
+      "id": "nz8siAjs1UbPFP9B61E7W",
+      "area": "qSEmgXP8SLVCNEKYS1sJd",
+      "code": "D24RKT",
+      "term": 2,
+      "type": "course",
+      "credits": 3,
+      "options": [
+        {
+          "title": "FUNDAMENTOS DE CIRCUITOS",
+          "number": "1002",
+          "credits": 3,
+          "subject": "IELE"
+        }
+      ]
+    },
+    {
+      "id": "CcCW3uMemdTP4ABNV2wfb",
+      "area": "qSEmgXP8SLVCNEKYS1sJd",
+      "code": "Q74AWS",
+      "term": 4,
+      "type": "course",
+      "credits": 3,
+      "options": [
+        {
+          "title": "ELEMENT.SISTEMAS ELÉCTRICOS",
+          "number": "2100",
+          "credits": 3,
+          "subject": "IELE"
+        }
+      ]
+    },
+    {
+      "id": "MZaIE1oQ-f7ZFJvhBVR4D",
+      "area": "qSEmgXP8SLVCNEKYS1sJd",
+      "code": "CZMT5B",
+      "term": 3,
+      "type": "course",
+      "credits": 3,
+      "options": [
+        {
+          "title": "SEÑALES",
+          "number": "2500",
+          "credits": 3,
+          "subject": "IELE"
+        }
+      ]
+    },
+    {
+      "id": "RpEy3kqrsDmwmJFIrjH1W",
+      "area": "qSEmgXP8SLVCNEKYS1sJd",
+      "code": "V2V3QB",
+      "term": 4,
+      "type": "course",
+      "label": "Teoría Electromagnética",
+      "credits": 3,
+      "options": [
+        {
+          "title": "TEORÍA ELECTROMAGNÉTICA",
+          "number": "2002",
+          "credits": 3,
+          "subject": "IELE"
+        },
+        {
+          "title": "ELECTROMAGNETISMO 2",
+          "number": "3632",
+          "credits": 3,
+          "subject": "FISI"
+        }
+      ]
+    },
+    {
+      "id": "iFIYTcHRfxvTiZMBtC3Ms",
+      "area": "qSEmgXP8SLVCNEKYS1sJd",
+      "code": "WS9NU7",
+      "term": 3,
+      "type": "course",
+      "credits": 3,
+      "options": [
+        {
+          "title": "FUNDAMENTOS DE ELECTRÓNICA",
+          "number": "2206",
+          "credits": 3,
+          "subject": "IELE"
+        }
+      ]
+    },
+    {
+      "id": "30Jw5alAfX6NaL7dvLMmW",
+      "area": "qSEmgXP8SLVCNEKYS1sJd",
+      "code": "NZBWQR",
+      "term": 5,
+      "type": "course",
+      "credits": 3,
+      "options": [
+        {
+          "title": "COMUNICACIONES",
+          "number": "2402",
+          "credits": 3,
+          "subject": "IELE"
+        }
+      ]
+    },
+    {
+      "id": "iPg2kL11U8_mbnCDFvUuT",
+      "area": "qSEmgXP8SLVCNEKYS1sJd",
+      "code": "FJ8NPE",
+      "term": 5,
+      "type": "course",
+      "credits": 3,
+      "options": [
+        {
+          "title": "ANÁLISIS DE SISTEMS DE CONTROL",
+          "number": "2300",
+          "credits": 3,
+          "subject": "IELE"
+        }
+      ]
+    },
+    {
+      "id": "NRUpBASgYxZBNAZro5XRZ",
+      "area": "qSEmgXP8SLVCNEKYS1sJd",
+      "code": "W7TZ5M",
+      "term": 5,
+      "type": "course",
+      "label": "Computación Científica",
+      "credits": 3,
+      "options": [
+        {
+          "title": "COMPUTACION CIENTÍFICA EN IEE",
+          "number": "2009",
+          "credits": 3,
+          "subject": "IELE"
+        },
+        {
+          "title": "MÉTODOS COMPUTACIONALES 2",
+          "number": "2528",
+          "credits": 2,
+          "subject": "FISI"
+        }
+      ]
+    },
+    {
+      "id": "Ps_zpZhV53gIJ53LWothf",
+      "area": "qSEmgXP8SLVCNEKYS1sJd",
+      "code": "ZGS97Z",
+      "term": 6,
+      "type": "course",
+      "credits": 3,
+      "options": [
+        {
+          "title": "REDES DE TELECOMUNICACIONES",
+          "number": "3402",
+          "credits": 3,
+          "subject": "IELE"
+        }
+      ]
+    },
+    {
+      "id": "_aw2t4WwtCyGtWNDEvX0E",
+      "area": "qSEmgXP8SLVCNEKYS1sJd",
+      "code": "RTGZ98",
+      "term": 7,
+      "type": "course",
+      "credits": 3,
+      "options": [
+        {
+          "title": "Análisis y Estimación SD",
+          "number": "3502",
+          "credits": null,
+          "subject": "IELE"
+        }
+      ]
+    },
+    {
+      "id": "tp39_cPtgT7TXvQjIcpWa",
+      "area": "NOJbdvGxiV_bkxKGKhInW",
+      "code": "5Q5CQT",
+      "term": 4,
+      "type": "course",
+      "credits": 2,
+      "options": [
+        {
+          "title": "DISEÑO DE SISTEMAS DIGITALES",
+          "number": "2202",
+          "credits": 3,
+          "subject": "IELE"
+        }
+      ]
+    },
+    {
+      "id": "yG8O-Yzcy7Ke3b2CT0Jf_",
+      "area": "NOJbdvGxiV_bkxKGKhInW",
+      "code": "8SXA4E",
+      "term": 6,
+      "type": "course",
+      "credits": 3,
+      "options": [
+        {
+          "title": "ELECTRÓNICA ANÁLOGA",
+          "number": "3200",
+          "credits": 3,
+          "subject": "IELE"
+        }
+      ]
+    },
+    {
+      "id": "syvEl_uzTO1WJDejcU2R2",
+      "area": "NOJbdvGxiV_bkxKGKhInW",
+      "code": "XQRYCA",
+      "term": 6,
+      "type": "course",
+      "credits": 2,
+      "options": [
+        {
+          "title": "INSTRUMENTACIÓN ELECTRÓNICA",
+          "number": "3206",
+          "credits": 3,
+          "subject": "IELE"
+        }
+      ]
+    },
+    {
+      "id": "ZM2l27YnU_yp542W8vpaf",
+      "area": "NOJbdvGxiV_bkxKGKhInW",
+      "code": "QBGJSA",
+      "term": 7,
+      "type": "course",
+      "credits": 3,
+      "options": [
+        {
+          "title": "ARQ Y TECN DE SIST DIGITALES",
+          "number": "3222",
+          "credits": 3,
+          "subject": "IELE"
+        }
+      ]
+    },
+    {
+      "id": "Vqx8ZXG6b3nKBCrtwHR-L",
+      "area": "Be4KaMOVAbKflj1ark8tZ",
+      "code": "DH8X9B",
+      "term": 1,
+      "type": "course",
+      "label": "Proyecto Retos IELC",
+      "credits": 3,
+      "options": [
+        {
+          "title": "PROYECTO RETOS IELC",
+          "number": "1218",
+          "credits": 3,
+          "subject": "IELE"
+        },
+        {
+          "title": "PROYECTO RETOS IELE",
+          "number": "1118",
+          "credits": 3,
+          "subject": "IELE"
+        },
+        {
+          "title": "INTR. A LA INGENIERÍA ELECTR.",
+          "number": "1000",
+          "credits": 3,
+          "subject": "IELE"
+        },
+        {
+          "title": "INTRO. A LA ING. BIOMÉDICA",
+          "number": "1010",
+          "credits": 3,
+          "subject": "IBIO"
+        },
+        {
+          "title": "INTRO. ING CIVIL Y AMBIENTAL",
+          "number": "1001",
+          "credits": 3,
+          "subject": "ICYA"
+        },
+        {
+          "title": "INTROD. INGEN. INDUSTRIAL",
+          "number": "1000",
+          "credits": 3,
+          "subject": "IIND"
+        },
+        {
+          "title": "INTRODUCC.INGEN.MECÁNICA",
+          "number": "1000",
+          "credits": 3,
+          "subject": "IMEC"
+        },
+        {
+          "title": "INTRO. DISEÑO INTE.PROD Y PROC",
+          "number": "1031",
+          "credits": 3,
+          "subject": "IQYA"
+        },
+        {
+          "title": "INTROD. INGENIERÍA DE SISTEMAS",
+          "number": "1001",
+          "credits": 3,
+          "subject": "ISIS"
+        }
+      ]
+    },
+    {
+      "id": "rHig_OqJYbwOoZ0HhjJuz",
+      "area": "Be4KaMOVAbKflj1ark8tZ",
+      "code": "K5JU6V",
+      "term": 2,
+      "type": "course",
+      "credits": 1,
+      "options": [
+        {
+          "title": "TALLER IEE 1",
+          "number": "1081",
+          "credits": 1,
+          "subject": "IELE"
+        }
+      ]
+    },
+    {
+      "id": "-JT5JO19INUiqgTN5HMoO",
+      "area": "Be4KaMOVAbKflj1ark8tZ",
+      "code": "PEPE7F",
+      "term": 3,
+      "type": "course",
+      "credits": 1,
+      "options": [
+        {
+          "title": "TALLER IEE 2",
+          "number": "1082",
+          "credits": 1,
+          "subject": "IELE"
+        }
+      ]
+    },
+    {
+      "id": "yTVN5sGPeQjLD1qvNMaUd",
+      "area": "Be4KaMOVAbKflj1ark8tZ",
+      "code": "XMBWWY",
+      "term": 4,
+      "type": "course",
+      "credits": 2,
+      "options": [
+        {
+          "title": "PROYECTO FORMULACIÓN Y GESTIÓN",
+          "number": "2218",
+          "credits": 2,
+          "subject": "IELE"
+        }
+      ]
+    },
+    {
+      "id": "QbpN5Uhb5YvHp2xTdArdh",
+      "area": "Be4KaMOVAbKflj1ark8tZ",
+      "code": "EYU8UV",
+      "term": 6,
+      "type": "course",
+      "credits": 3,
+      "options": [
+        {
+          "title": "PROYECTO DE INGENIERÍA",
+          "number": "3018",
+          "credits": 3,
+          "subject": "IELE"
+        }
+      ]
+    },
+    {
+      "id": "ZejO1CpTDwFPURMqWr9-M",
+      "area": "Be4KaMOVAbKflj1ark8tZ",
+      "code": "SHZZT3",
+      "term": 7,
+      "type": "course",
+      "credits": 3,
+      "options": [
+        {
+          "title": "Proyecto Diseño IELC",
+          "number": "3218",
+          "credits": 3,
+          "subject": "IELE"
+        }
+      ]
+    },
+    {
+      "id": "8kafy4YzesOFtdh2EElEQ",
+      "max": null,
+      "min": 1,
+      "area": "t29D79ih0nOC-wKoXaj0j",
+      "code": "N529ZU",
+      "from": [
+        "IELE-3700:3799",
+        "IELE-4005",
+        "IELE-3090",
+        "IELE-3336"
+      ],
+      "term": 7,
+      "type": "pool",
+      "unit": "classes",
+      "label": "Curso Integrador"
+    },
+    {
+      "id": "TIcj9YupRNfk_foYxut2P",
+      "max": null,
+      "min": 8,
+      "area": "t29D79ih0nOC-wKoXaj0j",
+      "code": "TSP8BH",
+      "from": [
+        "IELE-3230:3299",
+        "IELE-3310:3599",
+        "IELE-4009:4999",
+        "IELE-3096:3099",
+        "IMEC-3345",
+        "MAIA-4340:4369"
+      ],
+      "term": 7,
+      "type": "pool",
+      "unit": "credits",
+      "label": "Electivas de Programa"
+    }
+  ],
+  "provenance": {
+    "author": "Mauricio Guerrero",
+    "status": "borrador"
+  }
+}

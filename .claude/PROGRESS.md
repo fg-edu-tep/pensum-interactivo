@@ -389,7 +389,155 @@ format for the P2 importer (not consumed by the current `seed.ts`).
   `npm run build` passes, `/api/health` `{"ok":true,"db":"up"}`, picker + graph +
   `/p/iele-cbu3` all 200. **Not yet run against the real Neon DB / deployed.**
 
+**Session 2026-09-24 — click-selection fix, Mauricio's JSON pensum exports reconciled + applied to prod, masters catalogs added.**
+- **Bug fix (`MapCanvas.tsx`).** The hover-dimming flicker fix (same session,
+  earlier commit) had added `selectable: false` to `courseCard` nodes on top
+  of the pre-existing `draggable: false`. React Flow derives a node's CSS
+  `pointer-events` from `isSelectable || isDraggable || onNodeClick || ...`
+  (the top-level `<ReactFlow>` handler props — none of which this app sets,
+  since clicks/hover go through `data.onClick`/`data.onHover` on the
+  `CourseCard` button instead). With both false, React Flow set
+  `pointer-events: none` on the whole node, silently swallowing clicks.
+  Removed the stray flag. Pushed to `main` (`5a98659`) and mirrored via PR to
+  `fg-edu-tep/pensum-interactivo#1` (the fork Vercel deploys from).
+- **`electivas/{iele,ielc,m-iele,m-maia}.json`** — new source files: exports
+  from a platform the coordinator (Mauricio) is piloting, richer than the
+  `.xlsx` pipeline (stable rule IDs, `course`/`pool`/`group` rule types,
+  precise elective code ranges instead of free-text names). Added to the
+  repo as source data alongside the existing `.xlsx` files.
+- **Trust hierarchy defined and applied:** live Uniandes API > this JSON >
+  legacy `.xlsx`, with case-by-case overrides where corroborating evidence
+  disagreed (full reasoning + every verified conflict in
+  `~/.claude/projects/.../memory/electivas-json-trust-hierarchy.md`). Found
+  and fixed one real bug in our own `PENSUMS PREGRADO` sheet (`ielc-cbu3`'s
+  semester-6 slot was coded `IELE3106` — Electrónica de Potencia — but should
+  have been `IELE3200` — Electrónica Análoga) and one stale course code
+  (`IELE2150` → `IELE2110`, confirmed via a live API pull that the old code
+  no longer exists). Also caught JSON-side errors (wrong credits on
+  `IELE3106`/`IELE1200`/`IELE2202`, an internal inconsistency between
+  `iele.json` and `ielc.json` on `IELE1200`'s credits, and an impossible
+  term-1 placement for `MATE2210` given its own prerequisite chain) — none of
+  those were applied.
+- **Applied directly to the Neon production DB** (ad-hoc scripts run via the
+  Vercel-linked project + `vercel env pull`, not yet a real importer —
+  `CatalogSnapshot` written per catalog first, `AuditLog` entry per change,
+  actor `claude-code:*`): 3 new `Course` rows (`MATE2301`, `IELE3200`,
+  `IELE2110`), 13 `CatalogCourse` rebinds across all 5 CBU3 catalogs
+  (`manuallyEdited: true` so a future re-seed won't touch them), 7 stale
+  `ManualPairing` rows dropped. One item deliberately left `needs_manual`:
+  `doble-cbu3`'s `IELE 1X18` slot — a genuine either/or between
+  `IELE1118`/`IELE1218` for the combined program that no source resolves.
+- **Two new published catalogs**, built straight from the JSON since neither
+  existed before (pure addition — nothing to conflict with): `m-iele`
+  (Maestría en Ingeniería Eléctrica, id 6, 40cr, 6 rows) and `m-maia`
+  (Maestría en Inteligencia Artificial, id 7, 36cr, 12 rows). Both credit
+  sums verified exact against `program.totalCredits`. `accentColor`/
+  `tagline`/`imagePath` left null — no design pass done, so their picker
+  cards render plain until that happens.
+- **Schema gap surfaced, not yet built:** the JSON's `pool` (elective by
+  code-range, e.g. `IELE-3230:3299`) and `group` (`"choose 2 of 3"`) rule
+  types have no first-class `CatalogCourse` equivalent. Every pool/group in
+  this session was represented as one descriptive `ELECTIVA`/`CLE`
+  placeholder row carrying its aggregate credit target + range in
+  `placeholderLabel` (same convention as the existing pregrado "Electivas de
+  Programa" pools) — workable, but loses precision a real importer should
+  capture structurally. See "Next" below.
+
+**Session 2026-09-30 — explorer hover-flicker fix + Banner/Registro master-Excel prereq pipeline.**
+
+- **Distinguish "unverified" from "not offered" in the offering box
+  (`components/explorer/SidePanel.tsx`, `components/legacy/SidePanel.tsx`,
+  `app/globals.css`, `components/explorer/explorer.module.css`).**
+  `offering === undefined` (pairing never ran/confirmed anything for this
+  course) was rendering identically to `offering.offered === false` (the
+  live API confirmed zero sections this term) — same grey box, same "No se
+  dicta" text, even though the first case is "we don't know" and the second
+  is "we checked and it's not happening." Added a third `unknown` state
+  (hollow dot, dashed box border, "Sin verificar en la oferta en línea") in
+  both the new explorer and legacy `SidePanel`, so a course that was never
+  paired doesn't get quietly misreported as confirmed-not-offered.
+- **Explorer hover-flicker fix (`components/explorer/MapCanvas.tsx`).** Reported
+  independently of the 2026-09-24 review meeting: rapidly sweeping the cursor
+  across the course grid in the new `/p` explorer flickered / briefly went
+  blank. Root cause: `handleHover` called `onHover(id)` — which feeds
+  `hoveredId` into the `useMemo` that rebuilds the highlighted nodes/edges —
+  on *every* `mouseenter`, so crossing a dozen cards a second tore down and
+  rebuilt the highlighted-edge set at the same rate. Confirmed by
+  instrumenting the live page: a synthetic 60-card sweep produced continuous
+  edge-count churn (`0→7→0→5→0…`, changing every 15-30ms) while node count
+  stayed flat. Fix: debounce the *commit* of a new hover target by 70ms
+  (clearing immediately on mouse-leave so nothing lingers); the existing
+  250ms tooltip-position debounce is untouched. Re-verified after the fix:
+  the same 60-card sweep produces **zero** edge churn, while pausing on a
+  single card still commits the highlight normally. Confirmed the legacy
+  `/v1` view has no hover-driven code path at all (`CourseNode.tsx` /
+  `CurriculumGraph.tsx` — no `onMouseEnter` anywhere), so this bug and fix
+  are scoped to the new explorer only. `npm run build` passes.
+- **Banner/Registro master Excel as the prereq/coreq/name/credits source
+  (`lib/import/parsePrereqExport.ts`, `scripts/seed.ts`).** Mauricio's
+  official Registro export landed at the repo root as `Excel_Registro.xlsx`
+  (sheet `Export`, ~116,700 rows, every term back to ~2004 — replaces the
+  old pre-filtered `PRERREQUISITOS TODOS 202620.xlsx`, 2900 rows / one term).
+  Same column schema, so the existing parser mostly worked — but found a
+  real landmine before shipping it: **within the master file a course code's
+  rows are not chronological — newest period first** (e.g. `IELE-1002`:
+  `202620, 202610, 202520, … 200620`). The old parser's `map.set(code, …)`
+  "last row wins" logic, correct for the old single-term file, would have
+  silently kept each course's *oldest* prereq/credits/name on file (in some
+  cases a ~2007 snapshot) instead of the current one. Fixed:
+  `parsePrereqExport(buffer, term)` now takes an explicit term and skips any
+  row whose `Periodo` doesn't match it before building the map; `seed.ts`
+  passes `OFFERINGS_TERM` (default `202620`) through. Verified two ways: (1)
+  a direct parser call against `Excel_Registro.xlsx` at term 202620 — e.g.
+  `IELE3200` ("Electrónica Análoga") prereq resolves to `IELE 2206`, *not*
+  `IELE 2100`, confirming Mauricio's B-2 correction (Análoga doesn't depend
+  on Elementos) holds once a pensum slot actually points at the right code;
+  (2) a full local `SEED_REBUILD_COURSES=1 npm run seed` against the local
+  docker Postgres — 2624 rows at term 202620, all 5 catalogs at their prior
+  course counts, no crashes/warnings beyond the pre-existing known SEM
+  column quirk (see Gotchas).
+- **`findFile()` hardened (`scripts/seed.ts`).** Previously assumed exactly
+  one file matches each glob; with both the old and new prereq files
+  present at once that silently depended on filesystem directory-listing
+  order. Now: multiple matches log a loud warning and deterministically
+  prefer `Excel_Registro*` over `PRERREQUISITOS*` rather than picking
+  whichever the FS happens to list first.
+- **Repo cleanup.** Removed the now-superseded `PRERREQUISITOS TODOS
+  202620.xlsx` (tracked, 2900-row single-term file) and an untracked
+  byte-identical duplicate of the master file (`Prerrequisitos UA
+  202620.xlsx`) — confirmed via `md5sum` before deleting. `Excel_Registro.xlsx`
+  is now the sole, canonical prereq-export input at the repo root.
+  `CLAUDE.md`'s source-data bullet updated to match and to spell out the
+  pensum-structure vs. prereq-data split (D-3 in the 2026-09-24 review).
+- **Found, not fixed: the actual B-2 root cause lives in the *pensum*
+  Excel, not the prereq one.** `PENSUMS PREGRADO (DOCUMENTO BASE)) CBU3.xlsx`
+  (unchanged, still the department's tracked file) still places `IELE3106`
+  ("Electrónica de Potencia") in the semester-6 slot of `iele-cbu3` /
+  `ielc-cbu3` where it should be `IELE3200` ("Electrónica Análoga") — this
+  is *which course occupies which slot*, D-3's other, separate input, and
+  `Excel_Registro.xlsx` can't fix it by itself. The 2026-09-24 session
+  patched this directly on the **Neon prod DB** via an ad-hoc script
+  (`manuallyEdited: true`), but that patch was never written back into the
+  tracked `PENSUMS…xlsx` — so today's rebuild reproduced the mislabeling
+  locally (now correctly surfaced as "Electrónica de Potencia," rather than
+  silently papered over), and running `SEED_REBUILD_COURSES=1` against
+  **prod** as-is would discard that session's hand patches (13
+  `CatalogCourse` rebinds, 3 new `Course` rows, 7 dropped `ManualPairing`
+  rows) since none of them are reflected in the tracked source Excel.
+  **Not done today, deliberately:** touching the Neon prod DB. Everything
+  above was verified only against the local docker-compose Postgres. Before
+  a `SEED_REBUILD_COURSES=1` run against prod: either get Mauricio's
+  corrected `PENSUMS` Excel (M-2) so the rebuild reproduces the same fixes
+  structurally, or re-apply the 2026-09-24 hand patches after rebuilding.
+
 ## Next
+
+**Apply the Excel_Registro-based rebuild to prod, correctly.** Get Mauricio's
+corrected `PENSUMS PREGRADO` Excel (the `IELE3106`→`IELE3200` slot fix, M-2)
+before running `SEED_REBUILD_COURSES=1` against Neon — otherwise it silently
+reverts the 2026-09-24 hand patches described above. Once the corrected
+pensum Excel is in, cross-check every row against the rendered pensum (D-2)
+before treating the rebuild as safe to run on prod.
 
 **P2.2 — direct editors** (DB-authoritative CRUD): catalog identity + `Catalog.rules`
 (attestations/gates) form; `CatalogCourse` table editor (every field, add/remove,
@@ -404,6 +552,16 @@ reorder, `manuallyEdited` + per-field `lockedFields`); `RequirementNode` CRUD;
 passthrough + a details-only re-pull.
 
 **P2.5 — snapshots/rollback + `AuditLog` viewer.**
+
+**Real JSON importer for `electivas/*.json`.** Today's application to prod
+was hand-scripted (see 2026-09-24 session above). A proper path needs:
+schema support for `pool` (code-range elective) and `group` (N-of-M) rules
+— today both get flattened into one descriptive placeholder row, losing
+structure — plus the field-level trust-hierarchy resolution (live API > JSON
+> xlsx) wired into `persistCatalog.ts`/`applyPlanes.ts`'s existing diff/apply
+flow instead of a one-off script, so future re-exports from Mauricio's
+platform go through the same reviewable `ImportJob` path as a `.xlsx`
+upload.
 
 **P3 — Docker.** Multi-stage `web/Dockerfile` (`output: "standalone"`, non-root,
 `prisma migrate deploy` on start, healthcheck). Extend the root `docker-compose.yml`
@@ -446,3 +604,15 @@ target now — this is for self-hosting parity.)
   become non-blocking warnings surfaced in the (future) admin validation report.
 - npm here has a `allow-scripts` wrapper that blocks postinstall; `prisma generate`
   is wired into `npm run build`, run it manually after a fresh `npm install`.
+- **Querying/writing the real Neon DB from this machine:** the Vercel project
+  is `fg-edu-teps-projects/pensum` (not under the `fgutep` personal account —
+  `vercel login`/`vercel link` need the `fg-edu-tep` account). `vercel env
+  pull` only has `DATABASE_URL`/`DIRECT_URL` under the **Production**
+  environment (Development has none). `schema.prisma`'s datasource is
+  currently a local-only MySQL override (see the comment at the top of the
+  file, "not committed") to work around a local Prisma-engine auth bug on
+  Windows — to talk to Neon, temporarily flip it back to `postgresql` +
+  `env("DATABASE_URL")`/`env("DIRECT_URL")`, `prisma generate`, do the work,
+  then flip it back and `prisma generate` again. Neon's serverless compute
+  scales to zero when idle — a "Can't reach database server" on the first
+  query after a pause is normal, just retry once.

@@ -2,8 +2,8 @@
 
 import { Handle, Position } from "reactflow";
 import type { Course, AvailabilityStatus } from "@/lib/types";
-import { groupOf, groupClass, toSentenceCase, termShort } from "./format";
-import { CheckIcon, LockIcon } from "./icons";
+import { groupOf, groupClass, toSentenceCase, termShort, type CourseGroup } from "./format";
+import { BasketIcon, CheckIcon, LockIcon } from "./icons";
 import styles from "./explorer.module.css";
 
 export type RelationState =
@@ -13,8 +13,8 @@ export type RelationState =
   | "chainIndirectFull"
   | "unlockSole"
   | "unlockAmong"
+  | "downstream"
   | "unrelated"
-  | "hovered"
   | null;
 
 export interface CourseCardData {
@@ -29,9 +29,36 @@ export interface CourseCardData {
   isStaged: boolean;
   isJustUnlocked: boolean;
   isDimmed: boolean;
-  isTourAnchor?: boolean;
   onClick: (id: string) => void;
   onHover: (id: string | null, rect?: DOMRect) => void;
+}
+
+/** Second channel for course type (shape, not just hue): Proyecto/CBU and
+ * Otras/IELE sit close in colour at card size, and colour alone fails for
+ * colour-blind users. 8×8, drawn in the card's secondary text colour. */
+export function TypeGlyph({ group }: { group: CourseGroup }) {
+  const common = { width: 8, height: 8, viewBox: "0 0 8 8", "aria-hidden": true as const, className: styles.typeGlyph };
+  switch (group) {
+    case "iele": // circle
+      return <svg {...common}><circle cx="4" cy="4" r="3.5" fill="currentColor" /></svg>;
+    case "cb": // square
+      return <svg {...common}><rect x=".5" y=".5" width="7" height="7" fill="currentColor" /></svg>;
+    case "otr": // diamond
+      return <svg {...common}><path d="M4 0 8 4 4 8 0 4z" fill="currentColor" /></svg>;
+    case "pro": // triangle
+      return <svg {...common}><path d="M4 .5 7.8 7.5H.2z" fill="currentColor" /></svg>;
+    case "ele": // hollow ring
+      return <svg {...common}><circle cx="4" cy="4" r="3" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>;
+    case "cbu": // half circle
+      return (
+        <svg {...common}>
+          <circle cx="4" cy="4" r="3.25" fill="none" stroke="currentColor" strokeWidth="1" />
+          <path d="M4 .75a3.25 3.25 0 0 0 0 6.5z" fill="currentColor" />
+        </svg>
+      );
+    default: // requisito: bar
+      return <svg {...common}><rect x="0" y="3" width="8" height="2" fill="currentColor" /></svg>;
+  }
 }
 
 const STATUS_LABEL: Record<AvailabilityStatus, string> = {
@@ -54,7 +81,6 @@ export default function CourseCard({ data }: { data: CourseCardData }) {
     isStaged,
     isJustUnlocked,
     isDimmed,
-    isTourAnchor,
     onClick,
     onHover,
   } = data;
@@ -73,8 +99,7 @@ export default function CourseCard({ data }: { data: CourseCardData }) {
     mode === "progress" && status === "approved" ? styles.stApproved : "",
     mode === "progress" && isPlanned ? styles.stPlanned : "",
     mode === "progress" && !isPlanned && status === "available" ? styles.stAvailable : "",
-    mode === "progress" && status === "one-away" ? styles.stOneAway : "",
-    mode === "progress" && status === "blocked" && !isLocked ? styles.stBlocked : "",
+    mode === "progress" && !isPlanned && status !== "approved" && status !== "available" && !isLocked ? styles.stBlocked : "",
     mode === "progress" && isLocked ? styles.stAdmin : "",
   ]
     .filter(Boolean)
@@ -95,20 +120,30 @@ export default function CourseCard({ data }: { data: CourseCardData }) {
       onBlur={() => onHover(null)}
       aria-label={`${course.code} ${title}, ${course.credits} créditos${accessibleState ? `, ${accessibleState}` : ""}`}
       title={title}
-      data-tour-target={isTourAnchor ? "true" : undefined}
+      data-course-id={course.id}
     >
       <Handle type="target" position={Position.Left} style={{ opacity: 0 }} />
       {reqNumber != null && <span className={styles.numberBadge}>{reqNumber}</span>}
       {mode === "progress" && isPlanned && plannedTerm && (
-        <span className={`${styles.tag}`}>{termShort(plannedTerm)}</span>
+        <span className={`${styles.tag}`}>
+          <BasketIcon size={10} />
+          {termShort(plannedTerm)}
+        </span>
       )}
-      {mode === "progress" && !isPlanned && status === "one-away" && (
-        <span className={`${styles.tag} ${styles.tagOne}`}>falta 1</span>
+      {mode === "progress" && status === "approved" && (
+        <span className={styles.seenBadge} aria-hidden>
+          <CheckIcon size={12} />
+        </span>
       )}
+      {mode === "progress" && isLocked && status !== "approved" && (
+        <span className={styles.lockBadge} aria-hidden>
+          <LockIcon size={10} />
+        </span>
+      )}
+      {isSlot && <span className={styles.slotDash} aria-hidden />}
       <div className={styles.cardTop}>
         <span className={styles.cardCode}>
-          {mode === "progress" && status === "approved" && <CheckIcon />}
-          {mode === "progress" && isLocked && <LockIcon />}
+          <TypeGlyph group={group} />
           {course.code}
         </span>
         <span className={styles.cardCredits}>{course.credits > 0 ? `${course.credits} cr` : "—"}</span>

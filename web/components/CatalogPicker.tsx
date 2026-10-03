@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { termLabel } from "@/lib/term";
 import Link from "next/link";
 
 export interface PickerCatalog {
@@ -22,14 +23,7 @@ function trackOf(c: PickerCatalog): Track {
   return /prec/i.test(c.variantLabel) ? "precalculo" : "standard";
 }
 
-export default function CatalogPicker({
-  catalogs,
-  basePath = "/p",
-}: {
-  catalogs: PickerCatalog[];
-  /** where a row links to, e.g. "/v1/p" for the frozen legacy explorer. */
-  basePath?: string;
-}) {
+export default function CatalogPicker({ catalogs }: { catalogs: PickerCatalog[] }) {
   const [track, setTrack] = useState<Track>("standard");
 
   const hasPrecalculo = useMemo(
@@ -100,7 +94,7 @@ export default function CatalogPicker({
                   return (
                     <Link
                       className="picker-row"
-                      href={`${basePath}/${c.slug}`}
+                      href={`/p/${c.slug}`}
                       key={c.slug}
                       style={{ ["--accent" as string]: accent }}
                     >
@@ -118,7 +112,7 @@ export default function CatalogPicker({
                         {c.tagline ? <p className="pr-tagline">{c.tagline}</p> : null}
                       </div>
                       <div className="pr-meta">
-                        {c.subtitle ?? `${c.courseCount} cursos · periodo ${c.term}`}
+                        {c.subtitle ?? `${c.courseCount} cursos · periodo ${termLabel(c.term)}`}
                       </div>
                       <span className="pr-cta">Ver pensum →</span>
                     </Link>

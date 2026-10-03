@@ -1,0 +1,179 @@
+{
+  "schemaVersion": "1.0",
+  "program": {
+    "code": "M-IELE",
+    "name": "Maestría en Ingeniería Eléctrica",
+    "totalCredits": 40,
+    "catalogYearStart": "202010"
+  },
+  "areas": [
+    {
+      "id": "D1EILB-fcH0CaKN2hrhSp",
+      "name": "Ciclo de Fundamentos",
+      "targetCredits": 8
+    },
+    {
+      "id": "233j5sxkTOUAti8LzyLn1",
+      "name": "Ciclo de Profundización",
+      "targetCredits": 12
+    },
+    {
+      "id": "yBEo3IjKKf-E-Jva9ya9N",
+      "name": "Ciclo de Investigación",
+      "targetCredits": 12
+    },
+    {
+      "id": "cnWqFbEm3tis3dL4rdqlf",
+      "name": "Ciclo complementario",
+      "targetCredits": 8
+    }
+  ],
+  "rules": [
+    {
+      "id": "W10s_kUMcVuVKXrgTVlW2",
+      "area": "D1EILB-fcH0CaKN2hrhSp",
+      "code": "DHFJ57",
+      "term": 1,
+      "type": "group",
+      "label": "Fundamentos",
+      "require": {
+        "max": null,
+        "min": 2,
+        "kind": "nOf",
+        "unit": "rules"
+      },
+      "children": [
+        {
+          "id": "YL5XFIocA8LUiGxGyXmHx",
+          "area": null,
+          "code": "AWWFUJ",
+          "type": "course",
+          "credits": 4,
+          "options": [
+            {
+              "title": "PROCESOS ESTOCÁSTICOS",
+              "number": "4010",
+              "credits": 4,
+              "subject": "IELE"
+            }
+          ]
+        },
+        {
+          "id": "WGfSuYTf86RRhPEY59Bsf",
+          "area": null,
+          "code": "6M35P5",
+          "type": "course",
+          "credits": 4,
+          "options": [
+            {
+              "title": "OPTIMIZACIÓN",
+              "number": "4011",
+              "credits": 4,
+              "subject": "IELE"
+            }
+          ]
+        },
+        {
+          "id": "i2fKBjyygfarRF9rsNC32",
+          "area": null,
+          "code": "SAASSD",
+          "type": "course",
+          "credits": 4,
+          "options": [
+            {
+              "title": "SIST. LINEALES MULT. VARIABLES",
+              "number": "4009",
+              "credits": 4,
+              "subject": "IELE"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "H9jJg5I0WWnoeJ3dFwOEN",
+      "max": null,
+      "min": 12,
+      "area": "233j5sxkTOUAti8LzyLn1",
+      "code": "Q4FZQ6",
+      "from": [
+        "IELE-4100:4199",
+        "IELE-4900:4929",
+        "IELE-4950:4969",
+        "IELE-4003:4014"
+      ],
+      "term": 2,
+      "type": "pool",
+      "unit": "credits",
+      "label": "Profundización"
+    },
+    {
+      "id": "ZwQl3D9xBhBlBH9Xbee3v",
+      "area": "yBEo3IjKKf-E-Jva9ya9N",
+      "code": "PBA488",
+      "term": 3,
+      "type": "course",
+      "label": "TESIS I",
+      "credits": 4,
+      "options": [
+        {
+          "title": "TESIS I M. ING. ELÉCTRICA",
+          "number": "4020",
+          "credits": 4,
+          "subject": "IELE"
+        }
+      ]
+    },
+    {
+      "id": "3b4QPim-9DV3uu687zmVg",
+      "area": "yBEo3IjKKf-E-Jva9ya9N",
+      "code": "5V6GFJ",
+      "term": 4,
+      "type": "course",
+      "label": "TESIS II",
+      "credits": 8,
+      "options": [
+        {
+          "title": "TESIS II M. ING. ELÉCTRICA",
+          "number": "4021",
+          "credits": 8,
+          "subject": "IELE"
+        }
+      ]
+    },
+    {
+      "id": "c15YCShLJrNvhiZP5hYYk",
+      "max": null,
+      "min": 4,
+      "area": "cnWqFbEm3tis3dL4rdqlf",
+      "code": "B2UTVH",
+      "from": [
+        "XXXX-4000:4999"
+      ],
+      "term": 3,
+      "type": "pool",
+      "unit": "credits",
+      "label": "Créditos Libres"
+    },
+    {
+      "id": "yag0p6Kd-caNuf1NPkKGF",
+      "max": null,
+      "min": 4,
+      "area": "cnWqFbEm3tis3dL4rdqlf",
+      "code": "6MTE8T",
+      "from": [
+        "IELE-4900:4999",
+        "IELE-4801",
+        "XXXX-4000:4999"
+      ],
+      "term": 2,
+      "type": "pool",
+      "unit": "credits",
+      "label": "Curso (Créditos) de otra Maestría"
+    }
+  ],
+  "provenance": {
+    "author": "Mauricio Guerrero",
+    "status": "borrador"
+  }
+}

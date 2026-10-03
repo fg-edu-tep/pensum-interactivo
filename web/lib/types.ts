@@ -45,6 +45,9 @@ export interface Course {
   coreqText: string;
   prereqTree: ReqNode | null;
   prereqCourseIds: string[];
+  /** subset of `prereqCourseIds` marked "*" in Registro: may be taken the same
+   * term (rendered dashed like a corequisite, doesn't hard-block) */
+  concurrentPrereqIds?: string[];
   prereqExternal: string[];
   /** parsed corequisite tree — courses that may be taken the same term (or earlier) */
   coreqTree: ReqNode | null;

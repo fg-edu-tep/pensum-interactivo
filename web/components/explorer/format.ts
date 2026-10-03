@@ -1,4 +1,5 @@
 import type { Course } from "@/lib/types";
+import { termLabel, planTerm } from "@/lib/term";
 
 /** DATA-01 stand-in: derive the display group from the code prefix — the
  * design doc's own default when an admin-editable `grupo` field is empty. */
@@ -76,22 +77,14 @@ export function spaceCode(code: string): string {
   return code.replace(/^([A-ZÑ]{2,6})(\d.*)$/, "$1 $2");
 }
 
-/** "202620" -> "2026-2" */
-export function termShort(term: string): string {
-  const year = term.slice(0, 4);
-  const period = term.slice(4);
-  return `${year}-${period === "10" ? "1" : period === "30" ? "V" : "2"}`;
-}
+/** "202620" -> "2026-2" (see lib/term.ts) */
+export const termShort = termLabel;
 
-/** Best-effort "next term" label for planner CTAs — display only. */
-export function nextTermShort(term: string): string {
-  const year = Number(term.slice(0, 4));
-  const period = term.slice(4);
-  if (period === "10") return `${year}-2`;
-  return `${year + 1}-1`;
+/** The term the basket/planner targets — derived from today's date, not from
+ * the (seed-time) catalog term, so it rolls over on its own. */
+export function nextTermShort(): string {
+  return termLabel(planTerm());
 }
-export function nextTermCode(term: string): string {
-  const year = Number(term.slice(0, 4));
-  const period = term.slice(4);
-  return period === "10" ? `${year}20` : `${year + 1}10`;
+export function nextTermCode(): string {
+  return planTerm();
 }

@@ -93,20 +93,6 @@
   height: 32px;
 }
 
-.versionLink {
-  font-size: 11.5px;
-  color: var(--muted);
-  text-decoration: none;
-  white-space: nowrap;
-  border: 1px solid var(--line-control);
-  border-radius: 999px;
-  padding: 4px 10px;
-}
-.versionLink:hover {
-  color: var(--accent);
-  border-color: var(--accent-border);
-}
-
 .planBtn {
   display: flex;
   flex-direction: column;
@@ -273,8 +259,8 @@
   background: var(--surface-sunken);
 }
 .ghostBtn.active {
-  background: #16a34a;
-  border-color: #16a34a;
+  background: var(--st-ok);
+  border-color: var(--st-ok);
   color: #fff;
 }
 .accentGhost {
@@ -552,43 +538,101 @@
   background: var(--surface-sunken);
 }
 
-.selectionBar {
+/* ---------- Selection card (replaces the dark pill) ---------- */
+/* The dock leaves 256px each side: the lower-left zoom + basket button never
+   sit under the card, however many chips it has to wrap. */
+.selDock {
   position: absolute;
-  left: 50%;
-  bottom: 20px;
-  transform: translateX(-50%);
+  left: 256px;
+  right: 256px;
+  bottom: 16px;
   z-index: 6;
-  height: 40px;
   display: flex;
-  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.selCard {
+  pointer-events: auto;
+  width: 100%;
+  max-width: 640px;
+  min-width: 0;
+  padding: 12px 14px 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 10px 28px rgba(16, 24, 40, 0.16);
+  display: flex;
+  flex-direction: column;
   gap: 10px;
-  padding: 0 8px 0 16px;
-  border-radius: 999px;
-  background: var(--ink);
-  color: #fff;
-  font-size: 13px;
-  box-shadow: 0 6px 18px rgba(16, 24, 40, 0.25);
-  white-space: nowrap;
 }
-.selectionCode {
-  font-family: "IBM Plex Mono", monospace;
-  font-weight: 700;
-}
-.selectionSummary {
-  color: rgba(255, 255, 255, 0.85);
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.selectionClear {
+.selHead { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.selCode { font-family: "IBM Plex Mono", monospace; font-weight: 600; font-size: 13px; color: var(--ink); flex-shrink: 0; }
+.selName { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.selClear {
+  flex-shrink: 0;
   border: none;
-  background: rgba(255, 255, 255, 0.14);
-  color: #fff;
-  border-radius: 999px;
-  padding: 6px 12px;
-  font-size: 12px;
+  background: none;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 6px;
 }
-.selectionClear:hover {
-  background: rgba(255, 255, 255, 0.24);
+.selClear:hover { color: var(--ink); background: var(--band-a); }
+.selClear kbd {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  padding: 1px 5px;
+  margin-left: 2px;
+  border: 1px solid var(--line-control);
+  border-radius: 4px;
+  background: var(--band-a);
+}
+.selNote { margin: 0; font-size: 12.5px; line-height: 1.4; color: var(--muted); }
+
+/* the three relation checkboxes */
+.relToggles { display: flex; flex-wrap: wrap; gap: 6px; }
+.relToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 9px 0 8px;
+  border: 1px solid var(--line-control);
+  border-radius: 9px;
+  background: var(--surface);
+  font-size: 12.5px;
+  color: var(--ink-2);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.relToggle:hover { background: var(--band-a); }
+.relToggle input { margin: 0; width: 15px; height: 15px; accent-color: var(--ink); cursor: pointer; }
+.relToggleOn { border-color: var(--ink-2); background: var(--surface); color: var(--ink); font-weight: 600; }
+.relToggle:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* a swatch in the colour/ring the map uses for that relation */
+.relSwatch { width: 14px; height: 8px; border-radius: 4px; flex-shrink: 0; }
+.relToggle[data-kind="needs"] .relSwatch { background: var(--edge-prereq); }
+.relToggle[data-kind="unlocks"] .relSwatch { background: var(--st-ok); }
+.relToggle[data-kind="depends"] .relSwatch { background: color-mix(in srgb, var(--ink) 28%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 40%, transparent); }
+.relCount {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--band-a);
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 900px) {
+  .selDock { left: 12px; right: 12px; bottom: 76px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .relToggle { transition: none; }
 }
 
 .legendPanel {
@@ -623,28 +667,39 @@
   width: 148px;
   height: 60px;
   box-sizing: border-box;
-  padding: 7px 9px 8px;
-  border-radius: 8px;
+  /* 8 + 12 (code row) + 3 (gap) + 30 (2 title lines) + 7 = 60. The 12px right
+     padding keeps credits clear of the corner state marker. */
+  padding: 8px 12px 7px 10px;
+  border-radius: var(--card-r);
   background: var(--card-color);
-  color: #fff;
+  color: var(--on-type);
+  font-variant-numeric: tabular-nums;
   border: none;
   text-align: left;
   cursor: pointer;
   box-shadow: 0 1px 2px rgba(16, 24, 40, 0.14);
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
   transition: opacity 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
 }
 .card:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--accent);
+  box-shadow: 0 0 0 2px var(--ring-gap), 0 0 0 4px var(--accent);
 }
 
-.typeIele { --card-color: var(--t-iele); }
-.typeCb { --card-color: var(--t-cb); }
-.typeOtr { --card-color: var(--t-otr); }
-.typePro { --card-color: var(--t-pro); }
+/* Hover ring is pure CSS (no React state → no re-render of the other cards).
+   It applies to every card (approved and blocked too) but never replaces a
+   relation ring, hence the :not() list. */
+/* the gap is --ring-gap so the ring floats on any surface (dark theme) */
+.card:not(.selected):not(.directPrereq):not(.chainIndirectFull):not(.unlockSole):not(.unlockAmong):hover {
+  box-shadow: 0 0 0 2px var(--ring-gap), 0 0 0 4px var(--ink);
+}
+
+.typeIele { --card-color: var(--t-iele); --on-type-2: var(--on-type-2-iele); }
+.typeCb { --card-color: var(--t-cb); --on-type-2: var(--on-type-2-cb); }
+.typeOtr { --card-color: var(--t-otr); --on-type-2: var(--on-type-2-otr); }
+.typePro { --card-color: var(--t-pro); --on-type-2: var(--on-type-2-pro); }
 
 .cardTop {
   display: flex;
@@ -654,9 +709,10 @@
 }
 .cardCode {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
+  font-size: 10.5px;
+  line-height: 12px;
   font-weight: 500;
-  opacity: 0.92;
+  color: var(--on-type-2); /* solid colour, never opacity — see tokens.css */
   display: flex;
   align-items: center;
   gap: 4px;
@@ -666,30 +722,49 @@
 }
 .cardCredits {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
-  font-weight: 600;
+  font-size: 10.5px;
+  line-height: 12px;
+  font-weight: 500;
+  color: var(--on-type-2);
   flex-shrink: 0;
 }
+.typeGlyph {
+  flex-shrink: 0;
+}
+/* blocked / admin cards swap to muted ink on hatching: their code + credits
+   must follow it instead of the type's light secondary colour */
+.stBlocked .cardCode, .stBlocked .cardCredits,
+.stAdmin .cardCode, .stAdmin .cardCredits {
+  color: inherit;
+}
 .cardTitle {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
-  line-height: 1.22;
+  line-height: 15px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
-/* slot / placeholder variants — outline only */
+/* slot / placeholder variants — same solid card as a real course, only the
+   colour (--card-color) differs, so every node reads and clicks the same. */
 .slotCard {
-  background: #fff;
-  border: 1.5px dashed var(--card-color);
-  color: var(--card-color);
-  box-shadow: none;
+  background: var(--card-color);
+  color: #fff;
 }
-.slotEle { --card-color: var(--t-ele); }
-.slotCbu { --card-color: var(--t-cbu); }
-.slotReq { --card-color: var(--t-req); }
+/* "to be defined" marker for slot cards. A child span, because ::after is
+   already used by the unlock sweep. */
+.slotDash {
+  position: absolute;
+  inset: 4px;
+  border: 1px dashed color-mix(in srgb, var(--on-type) 55%, transparent);
+  border-radius: calc(var(--card-r) - 3px);
+  pointer-events: none;
+}
+.slotEle { --card-color: var(--t-ele); --on-type-2: var(--on-type-2-ele); }
+.slotCbu { --card-color: var(--t-cbu); --on-type-2: var(--on-type-2-cbu); }
+.slotReq { --card-color: var(--t-req); --on-type-2: var(--on-type-2-req); }
 
 .numberBadge {
   position: absolute;
@@ -707,23 +782,47 @@
   justify-content: center;
   border: 2px solid #fff;
 }
+/* Basket pill: "this card is in your basket for <term>". Straddles the top
+   edge; its bottom stays above the code row so it never touches credits,
+   and it clears the semester header above the first row. */
 .tag {
   position: absolute;
   top: -9px;
-  right: 6px;
-  height: 17px;
-  padding: 0 7px;
+  right: 8px;
+  height: 16px;
+  padding: 0 6px;
   border-radius: 999px;
-  background: var(--accent);
+  background: var(--st-plan);
   color: #fff;
-  font-size: 9.5px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
   font-weight: 600;
-  border: 2px solid #fff;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  border: 2px solid var(--ring-gap);
+  box-sizing: border-box;
   display: flex;
   align-items: center;
+  gap: 3px;
 }
 .tag.tagOne {
-  background: var(--st-one-text);
+  background: var(--st-warn);
+}
+/* Administrative-rule marker (F-2): amber lock, same slot as the check. */
+.lockBadge {
+  position: absolute;
+  top: -9px;
+  right: -9px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--st-warn);
+  color: #fff;
+  border: 2px solid var(--ring-gap);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .checkIcon {
   display: inline-flex;
@@ -733,46 +832,68 @@
 }
 
 /* relation states (Explorar) */
-.selected {
-  box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--ink), 0 10px 24px rgba(16, 24, 40, 0.28);
+/* The selected card is the ONLY one with a 5px ring + drop shadow + lift, so it
+   can be found at normal zoom without relying on dimming the others (F-3: the
+   old black border made two cards look alike). */
+.card.selected {
+  box-shadow: 0 0 0 2px var(--ring-gap), 0 0 0 5px var(--accent), 0 6px 16px rgba(16, 24, 40, 0.18);
+  transform: translateY(-2px);
+  z-index: 6;
 }
-.directPrereq {
-  box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--accent);
+.card.directPrereq {
+  box-shadow: 0 0 0 2px var(--ring-gap), 0 0 0 4px var(--accent);
 }
 .chainIndirect {
   opacity: 0.82;
 }
-.chainIndirectFull {
+.card.chainIndirectFull {
   opacity: 1;
-  box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px var(--accent-soft);
+  box-shadow: 0 0 0 2px var(--ring-gap), 0 0 0 4px color-mix(in srgb, var(--accent) 45%, transparent);
 }
-.unlockSole {
+/* "Todo el pensum" view: indirect dependents further down the chain. A quiet,
+   neutral ring (green/amber stay reserved for DIRECT dependents). */
+.card.downstream {
+  box-shadow: 0 0 0 2px var(--ring-gap), 0 0 0 4px color-mix(in srgb, var(--ink) 28%, transparent);
+}
+.card.unlockSole {
   box-shadow: 0 0 0 4px var(--st-available);
 }
-.unlockAmong {
+.card.unlockAmong {
   box-shadow: 0 0 0 4px var(--st-one);
 }
 .unrelated {
   opacity: 0.34;
   filter: saturate(0.3);
 }
-.hovered {
-  box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--ink);
-}
 
 /* Mi avance status states */
 .stApproved {
+  --card-color: var(--st-ok);
+  --on-type-2: var(--on-type-2-ok);
   box-shadow: none;
   filter: none;
 }
-.stAvailable {
-  box-shadow: 0 0 0 4px var(--st-available);
+.seenBadge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--ring-gap);
+  color: var(--st-ok);
+  border: 2px solid var(--st-ok);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
+/* .stAvailable / .stPlanned intentionally carry NO ring: an available course
+   is the default, so it gets no mark (a ring on every one made the right half
+   of the map read as noise). Planned shows the basket pill instead. Kept as
+   empty hooks so Disponibles-chip spotlighting can attach here later. */
+.stAvailable,
 .stPlanned {
-  box-shadow: 0 0 0 4px var(--st-available);
-}
-.stOneAway {
-  box-shadow: 0 0 0 4px var(--st-one);
+  --quiet: 1;
 }
 .stBlocked {
   background: repeating-linear-gradient(
@@ -786,7 +907,6 @@
   box-shadow: none;
 }
 .stAdmin {
-  box-shadow: 0 0 0 4px var(--st-admin);
   background: repeating-linear-gradient(
     135deg,
     var(--st-blocked-a),
@@ -831,7 +951,7 @@
   to { transform: translateX(160%) skewX(-18deg); opacity: 0; }
 }
 .justUnlocked {
-  animation: unlockPop 1.9s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: unlockPop 1.8s cubic-bezier(0.22, 1, 0.36, 1) 3;
   z-index: 5;
 }
 .justUnlocked::after {
@@ -841,7 +961,7 @@
   border-radius: 8px;
   pointer-events: none;
   background: linear-gradient(100deg, transparent 35%, rgba(255, 255, 255, 0.7) 50%, transparent 65%);
-  animation: unlockGlare 1s ease-out 0.1s both;
+  animation: unlockGlare 1s ease-out 0.1s 3 both;
 }
 @media (prefers-reduced-motion: reduce) {
   .justUnlocked, .justUnlocked::after {
@@ -1040,6 +1160,10 @@
 .offerBox.on { background: #f3faf5; border-color: #d4ebdc; }
 .offerBox.off { background: var(--surface); border-color: var(--line); }
 .offerBox.stale { background: #fdf8ef; border-color: #f1e0c2; }
+/* "unknown": we never confirmed either way (pairing hasn't run for this
+   course yet) — a dashed border keeps it visually distinct from "off"
+   (confirmed not offered), so it doesn't read as a settled fact. */
+.offerBox.unknown { background: var(--surface); border-color: var(--line); border-style: dashed; }
 .offerLine {
   font-size: 13px;
   font-weight: 600;
@@ -1056,6 +1180,8 @@
 .offerDot.on { background: var(--st-available); }
 .offerDot.off { background: #9aa1ad; }
 .offerDot.stale { background: var(--st-one); }
+/* hollow dot = unverified, as opposed to a filled dot for any confirmed state */
+.offerDot.unknown { background: transparent; border: 1.5px solid #9aa1ad; }
 .offerDetail {
   font-size: 12px;
   color: var(--muted);
@@ -1224,6 +1350,7 @@
 .panelFooter {
   flex-shrink: 0;
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   padding: 14px 24px;
   border-top: 1px solid var(--line-soft);
@@ -1609,4 +1736,940 @@
 /* ---------- elective picker restyle ---------- */
 .slotPanelSection {
   margin-top: 16px;
+}
+
+/* ---------- Selección rápida chooser ---------- */
+.chooserBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(17, 22, 32, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.chooser {
+  width: min(560px, 100%);
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 16px 40px rgba(16, 24, 40, 0.28);
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+}
+.chooserTitle {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ink);
+  text-align: center;
+}
+.chooserGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  width: 100%;
+}
+@media (max-width: 520px) {
+  .chooserGrid { grid-template-columns: 1fr; }
+}
+.chooserCard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+  padding: 14px;
+  border-radius: 10px;
+  border: 1.5px solid var(--line-control);
+  background: #fff;
+  font-family: inherit;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.chooserCard strong { font-size: 14.5px; color: var(--ink); }
+.chooserCard:hover, .chooserCard:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent-tint);
+  outline: none;
+}
+.chooserKicker {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+/* ---------- Shopping basket (next-semester plan) ---------- */
+.basketHead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.basketBadge {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: var(--accent-tint);
+  color: var(--accent);
+  border: 1.5px solid var(--accent-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.basketCount {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--st-plan);
+  color: #fff;
+  border: 2px solid var(--ring-gap);
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: basketBump 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes basketBump {
+  0% { transform: scale(0.4); }
+  100% { transform: scale(1); }
+}
+.basketHeadText {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+.basketTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.basketSub {
+  font-size: 11.5px;
+  color: var(--muted-2);
+}
+.basketCredits {
+  margin-left: auto;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-tint);
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+.basketEmpty {
+  margin-top: 12px;
+  border: 1.5px dashed var(--accent-border);
+  background: #fafcff;
+  border-radius: 14px;
+  padding: 18px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  color: var(--accent-soft);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.basketEmpty strong { color: var(--ink-2); font-size: 13px; }
+.basketEmpty span { color: var(--muted); }
+.suggestAddPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 11px;
+  border-radius: 999px;
+  border: 1.5px solid var(--accent);
+  background: #fff;
+  color: var(--accent);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.suggestAddPill:hover { background: var(--accent); color: #fff; }
+
+.basketFab {
+  position: absolute;
+  left: 64px;
+  bottom: 20px;
+  z-index: 7;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 18px 9px 14px;
+  border: none;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 8px 22px rgba(31, 111, 196, 0.38);
+  font-family: inherit;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.basketFab:hover { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(31, 111, 196, 0.45); }
+.basketFabText {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.2;
+  font-size: 11.5px;
+}
+.basketFabText strong { font-size: 13px; }
+.basketFab .basketCount { top: -6px; right: -4px; }
+@media (prefers-reduced-motion: reduce) {
+  .basketCount { animation: none; }
+}
+
+/* ---------- 12. Basket checkout modal ("Tu canasta") ---------- */
+.bkOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: rgba(16, 24, 40, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: bkFade 0.18s ease-out;
+}
+@keyframes bkFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes bkRise { from { opacity: 0; transform: translateY(14px) scale(0.985); } to { opacity: 1; transform: none; } }
+.bkDialog {
+  width: min(1120px, 100%);
+  max-height: min(860px, 100%);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 16px;
+  box-shadow: 0 24px 64px rgba(16, 24, 40, 0.35);
+  overflow: hidden;
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  animation: bkRise 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* header: turns green and draws a check once the plan is complete */
+.bkHeader {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  transition: background 0.4s ease;
+  flex-shrink: 0;
+}
+.bkHeaderDone { background: var(--st-ok-tint); }
+.bkSeal {
+  flex-shrink: 0;
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--st-plan) 14%, white);
+  color: var(--st-plan);
+}
+.bkHeaderDone .bkSeal { background: var(--st-ok); color: #fff; }
+.bkSealCheck {
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+  animation: bkDraw 0.5s 0.15s ease-out forwards;
+}
+@keyframes bkDraw { to { stroke-dashoffset: 0; } }
+.bkHeadText { flex: 1; min-width: 0; }
+.bkTitle { margin: 0; font-size: 20px; line-height: 26px; font-weight: 700; }
+.bkSub { margin: 2px 0 0; font-size: 13.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.bkClose {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.bkClose:hover { color: var(--ink); background: var(--band-a); }
+
+/* two-step indicator */
+.bkStepper { display: flex; gap: 6px; list-style: none; margin: 0; padding: 4px; background: var(--band-a); border-radius: 10px; flex-shrink: 0; }
+.bkStepBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 12px 0 8px;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.bkStepBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+.bkStepNum {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--line-control);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.bkStepOn { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.1); }
+.bkStepOn .bkStepNum { background: var(--ink); border-color: var(--ink); color: #fff; }
+.bkStepDone .bkStepNum { background: var(--st-ok); border-color: var(--st-ok); color: #fff; }
+
+/* one scroll area, full width */
+.bkScroll { flex: 1; min-height: 0; overflow-y: auto; background: var(--canvas); }
+.bkReview { padding: 18px 22px 28px; display: flex; flex-direction: column; gap: 16px; }
+.bkSectionTitle { margin: 0; font-size: 15px; font-weight: 700; }
+.bkList { display: flex; flex-direction: column; gap: 10px; }
+
+.bkFooter {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 22px;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+.bkFootNote { flex: 1; min-width: 0; font-size: 12.5px; color: var(--muted); }
+.bkFootSpacer { flex: 1; }
+.bkFooter .btnPrimary, .bkFooter .btnGhostFooter { flex: none; height: 40px; padding: 0 16px; text-decoration: none; }
+
+.bkNotice {
+  background: color-mix(in srgb, var(--st-warn) 9%, white);
+  border: 1px solid color-mix(in srgb, var(--st-warn) 30%, white);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+.bkNotice strong { color: var(--ink); }
+.bkEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 48px 12px;
+  text-align: center;
+  color: var(--muted);
+}
+
+/* ---- the week, full width ---- */
+.bkWeekPanel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px 18px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.bkWeekTop { display: flex; align-items: center; gap: 10px; }
+.bkStats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.bkStat {
+  background: var(--canvas);
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.bkStatValue { font-size: 20px; line-height: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.bkStatLabel { font-size: 12px; line-height: 1.35; color: var(--muted); }
+.bkClashList {
+  margin: 0;
+  padding: 10px 12px 10px 28px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--st-warn) 9%, white);
+  border: 1px solid color-mix(in srgb, var(--st-warn) 30%, white);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+.bkClashList li { margin: 2px 0; }
+.bkClashList .bkLink { margin: 0 0 0 8px; }
+
+.bkWeek { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surface); }
+.bkWeekHead {
+  display: grid;
+  background: var(--band-a);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-2);
+  text-align: center;
+  padding: 7px 0;
+}
+.bkWeekBody { position: relative; display: grid; }
+.bkHours { position: relative; }
+.bkHours span {
+  position: absolute;
+  right: 6px;
+  transform: translateY(-7px);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  color: var(--muted-2);
+}
+.bkDayCol { position: relative; border-left: 1px solid var(--line-soft); }
+.bkDayCol i { position: absolute; left: 0; right: 0; height: 1px; background: var(--line-soft); }
+.bkBlock {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  border: none;
+  border-radius: 7px;
+  color: #fff;
+  text-align: left;
+  font: inherit;
+  padding: 5px 7px;
+  overflow: hidden;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.18);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.bkBlock:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(16, 24, 40, 0.25); z-index: 2; }
+.bkBlock:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+.bkBlockCode { font-family: "IBM Plex Mono", monospace; font-size: 11px; font-weight: 600; line-height: 1.2; white-space: nowrap; }
+.bkBlockName { font-size: 12px; font-weight: 600; line-height: 1.2; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.bkBlockMeta { font-family: "IBM Plex Mono", monospace; font-size: 10.5px; line-height: 1.25; color: rgba(255, 255, 255, 0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bkBlockClash {
+  outline: 2px solid var(--st-warn);
+  outline-offset: 1px;
+  background-image: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.28) 0 4px, transparent 4px 8px);
+}
+.bkWeekEmpty {
+  border: 1px dashed var(--line-control);
+  border-radius: 10px;
+  padding: 30px 12px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}
+.bkLegend { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.bkLegendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 6px;
+}
+.bkLegendItem:hover { background: var(--band-a); }
+.bkLegendItem i { width: 12px; height: 12px; border-radius: 4px; flex-shrink: 0; }
+
+/* ---- NRC explainer ---- */
+.bkNrcExplain { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+.bkNrcExplainHead {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: none;
+  background: none;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 12px;
+}
+.bkNrcExplainHead:hover { background: var(--canvas); }
+.bkNrcIcon {
+  flex-shrink: 0;
+  width: 38px;
+  height: 30px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--st-plan) 12%, white);
+  color: var(--st-plan);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  font-weight: 700;
+}
+.bkNrcExplainTitle { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; font-size: 13px; color: var(--muted); }
+.bkNrcExplainTitle strong { font-size: 14px; color: var(--ink); }
+.bkNrcExplainBody {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  padding: 2px 16px 16px;
+}
+.bkNrcExplainBody strong { font-size: 12.5px; }
+.bkNrcExplainBody p { margin: 3px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--ink-2); }
+
+/* ---- course cards ---- */
+.bkCourse {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+  scroll-margin-top: 8px;
+}
+.bkCourseOpen { box-shadow: 0 6px 20px rgba(16, 24, 40, 0.08); border-color: var(--line-control); }
+.bkCourseClash { border-color: color-mix(in srgb, var(--st-warn) 55%, white); }
+.bkCourseHead { display: flex; align-items: stretch; }
+.bkCourseToggle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 8px 12px 14px;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  border-radius: 12px;
+}
+.bkCourseToggle:hover { background: var(--canvas); }
+.bkGlyph {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+.bkCourseMain { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.bkCourseTitle { font-size: 14.5px; font-weight: 600; line-height: 1.25; }
+.bkCourseMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  font-size: 12.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.bkCode { font-family: "IBM Plex Mono", monospace; font-weight: 500; color: var(--ink-2); }
+.bkPicked { color: var(--ink-2); }
+.bkNrcTag {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--band-a);
+  color: var(--ink-2);
+}
+.bkAlt { color: var(--st-ok); font-weight: 500; }
+.bkMuted { color: var(--muted); font-size: 12.5px; }
+.bkBadgeWarn {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--st-warn);
+  color: #fff;
+}
+.bkChevron { flex-shrink: 0; color: var(--muted); display: flex; transition: transform 0.18s ease; }
+.bkChevronOpen { transform: rotate(180deg); }
+.bkRemove {
+  flex-shrink: 0;
+  width: 40px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 0 12px 12px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.bkRemove:hover { color: var(--ink); background: var(--band-a); }
+.bkCourseBody { padding: 2px 16px 16px 58px; display: flex; flex-direction: column; gap: 12px; }
+.bkDesc { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--ink-2); max-width: 72ch; }
+.bkDescClamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.bkLink {
+  margin-top: 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.bkLink:hover { text-decoration: underline; }
+.bkH3 {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.bkRefTag {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--st-warn) 14%, white);
+  color: var(--st-warn);
+}
+.bkReqs { display: flex; flex-direction: column; gap: 6px; }
+.bkReqRow { display: flex; gap: 10px; align-items: baseline; font-size: 12.5px; }
+.bkReqLabel { flex-shrink: 0; width: 86px; color: var(--muted); }
+.bkReqChips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.bkReqChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11.5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--band-a);
+  color: var(--ink-2);
+}
+.bkReqChip em { font-family: "IBM Plex Sans", sans-serif; font-style: normal; color: var(--st-plan); }
+.bkReqDone { background: var(--st-ok-tint); color: var(--st-ok); }
+
+/* sections */
+.bkSections { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 8px; }
+.bkSection {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  padding: 11px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.bkSection:hover { border-color: var(--line-control); background: var(--canvas); }
+.bkSectionOn {
+  border-color: var(--st-plan);
+  background: color-mix(in srgb, var(--st-plan) 6%, white);
+  box-shadow: 0 0 0 1px var(--st-plan);
+}
+.bkRadio {
+  flex-shrink: 0;
+  margin-top: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 1.5px solid var(--line-control);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+.bkSectionOn .bkRadio { background: var(--st-plan); border-color: var(--st-plan); }
+.bkSectionMain { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; font-size: 13px; }
+.bkSectionTop { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.bkNrc { font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--muted); }
+.bkSuggested {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--st-plan) 12%, white);
+  color: var(--st-plan);
+}
+.bkTeacher { color: var(--ink-2); }
+.bkMeeting { display: flex; flex-wrap: wrap; gap: 4px 10px; color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.bkDays { color: var(--ink-2); font-weight: 500; min-width: 92px; }
+.bkTime { font-family: "IBM Plex Mono", monospace; font-size: 12px; }
+.bkRoom { font-family: "IBM Plex Mono", monospace; font-size: 11.5px; }
+.bkSeats { flex-shrink: 0; font-size: 11.5px; font-weight: 600; padding: 3px 9px; border-radius: 999px; font-variant-numeric: tabular-nums; }
+.bkSeatsOk { background: var(--st-ok-tint); color: var(--st-ok); }
+.bkSeatsLow { background: color-mix(in srgb, var(--st-warn) 14%, white); color: var(--st-warn); }
+.bkSeatsFull { background: var(--band-b); color: var(--muted); text-decoration: line-through; }
+
+/* loading skeletons */
+.bkSkeleton, .bkSkeletonRow {
+  display: inline-block;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--band-a), var(--band-b), var(--band-a));
+  background-size: 200% 100%;
+  animation: bkShimmer 1.2s linear infinite;
+}
+.bkSkeleton { width: 140px; height: 12px; }
+.bkSkeletonRow { display: block; width: 100%; height: 64px; border-radius: 10px; }
+@keyframes bkShimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+/* ---- step 2: qué sigue ---- */
+.bkNext { padding: 22px 26px 30px; max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+.bkNextLead { margin: 0; font-size: 15px; line-height: 1.55; color: var(--ink-2); }
+.bkSteps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; counter-reset: none; }
+.bkStep {
+  display: flex;
+  gap: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 18px 20px;
+}
+.bkStepBadge {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 700;
+  font-size: 14px;
+}
+.bkStepBody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.bkStepBody h3 { margin: 0; font-size: 16px; line-height: 22px; }
+.bkStepBody p { margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--ink-2); max-width: 68ch; }
+.bkStepActions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.bkStepActions .btnPrimary, .bkStepActions .btnGhostFooter { flex: none; height: 40px; padding: 0 16px; text-decoration: none; }
+.bkNrcList {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--canvas);
+}
+.bkNrcList li { display: grid; grid-template-columns: 92px minmax(0, 1fr) 64px 84px; gap: 10px; align-items: center; padding: 8px 12px; font-size: 13px; border-top: 1px solid var(--line-soft); }
+.bkNrcList li:first-child { border-top: none; }
+.bkNrcCode { font-family: "IBM Plex Mono", monospace; font-weight: 500; color: var(--ink-2); }
+.bkNrcName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bkNrcSec { color: var(--muted); font-size: 12px; }
+.bkNrcValue {
+  justify-self: end;
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 700;
+  font-size: 14px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--surface);
+  border: 1px solid var(--line-control);
+  letter-spacing: 0.03em;
+}
+.bkTips, .bkHelp {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.bkTips ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; line-height: 1.55; color: var(--ink-2); }
+.bkHelp a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--accent);
+  text-decoration: none;
+}
+.bkHelp a:hover { text-decoration: underline; }
+
+@media (max-width: 860px) {
+  .bkOverlay { padding: 0; align-items: flex-end; }
+  .bkDialog { max-height: 94dvh; border-radius: 16px 16px 0 0; }
+  .bkStats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .bkNrcExplainBody { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .bkCourseBody { padding-left: 16px; }
+  .bkStepper { display: none; }
+  .bkFootNote { display: none; }
+  .bkNrcList li { grid-template-columns: 80px minmax(0, 1fr) 76px; }
+  .bkNrcSec { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bkOverlay, .bkDialog, .bkSkeleton, .bkSkeletonRow { animation: none; }
+  .bkSealCheck { animation: none; stroke-dashoffset: 0; }
+  .bkHeader, .bkCourse, .bkSection, .bkChevron, .bkBlock { transition: none; }
+}
+
+/* ---------- Mi avance: status swatches on the chips ---------- */
+.stSw { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; box-sizing: border-box; }
+.swApproved { background: var(--st-ok); border-radius: 999px; }
+.swAvailable { border: 1.5px solid var(--ink-2); border-radius: 999px; }
+.swBlocked { background: repeating-linear-gradient(135deg, var(--st-blocked-a) 0 2px, var(--st-blocked-b) 2px 4px); border: 1px solid var(--line-control); }
+.swAdmin { background: var(--st-warn); border-radius: 999px; }
+
+/* ---------- Welcome to Mi avance ---------- */
+.awBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 75;
+  background: rgba(16, 24, 40, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: bkFade 0.18s ease-out;
+}
+.awDialog {
+  position: relative;
+  width: min(940px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 18px;
+  box-shadow: 0 24px 64px rgba(16, 24, 40, 0.35);
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  animation: bkRise 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.awClose {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 2;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.awClose:hover { color: var(--ink); background: var(--band-a); }
+.awMain { padding: 30px 30px 24px; display: flex; flex-direction: column; gap: 10px; }
+.awTitle { margin: 0; font-size: 26px; line-height: 32px; font-weight: 700; }
+.awLead { margin: 0; font-size: 14.5px; line-height: 1.6; color: var(--ink-2); max-width: 54ch; }
+.awQ { margin: 14px 0 0; font-size: 15px; font-weight: 700; }
+.awOptions { display: flex; flex-direction: column; gap: 8px; }
+.awOption, .awOptionHead {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.awOption {
+  padding: 13px 15px;
+  border: 1px solid var(--line-control);
+  border-radius: 12px;
+  background: var(--surface);
+  transition: border-color 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
+}
+.awOptionHead { padding: 0; border: none; background: none; }
+.awOption:hover, .awOption:focus-visible { border-color: var(--ink-2); background: var(--canvas); }
+.awOptionOpen { border-color: var(--ink-2); background: var(--surface); box-shadow: 0 0 0 1px var(--ink-2); }
+.awOption strong { font-size: 14.5px; }
+.awOption span { font-size: 12.5px; line-height: 1.5; color: var(--muted); }
+.awPicker { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; padding-top: 12px; border-top: 1px solid var(--line-soft); cursor: default; }
+.awPickerLabel { font-size: 12.5px; color: var(--ink-2); font-weight: 500; }
+.awChips { display: flex; flex-wrap: wrap; gap: 6px; }
+.awChip {
+  min-width: 42px;
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--line-control);
+  border-radius: 8px;
+  background: var(--surface);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  cursor: pointer;
+}
+.awChip:hover { background: var(--band-a); }
+.awChipOn { background: var(--ink); border-color: var(--ink); color: #fff; }
+.awChipOn:hover { background: var(--ink); }
+.awPicker .btnPrimary { flex: none; align-self: flex-start; padding: 0 18px; height: 40px; }
+.awFoot { display: flex; align-items: center; gap: 10px; margin-top: 6px; color: var(--muted); }
+.awLinkBtn { border: none; background: none; padding: 2px 0; font: inherit; font-size: 13px; font-weight: 600; color: var(--accent); cursor: pointer; }
+.awLinkBtn:hover { text-decoration: underline; }
+
+.awKey { padding: 30px 26px 24px; background: var(--canvas); border-left: 1px solid var(--line); border-radius: 0 18px 18px 0; display: flex; flex-direction: column; gap: 12px; }
+.awKeyTitle { margin: 0 0 2px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted-2); }
+.awKeyRow { display: flex; align-items: center; gap: 14px; }
+.awKeyRow > span:last-child { display: flex; flex-direction: column; gap: 1px; font-size: 13px; }
+.awKeyRow em { font-style: normal; font-size: 12px; line-height: 1.4; color: var(--muted); }
+.awKeyDivider { height: 1px; background: var(--line); margin: 2px 0; }
+.awLine { flex-shrink: 0; }
+/* card miniatures — same language as the real cards */
+.awMini { position: relative; flex-shrink: 0; width: 40px; height: 26px; border-radius: 6px; background: var(--t-iele); box-shadow: 0 1px 2px rgba(16, 24, 40, 0.14); }
+.awMiniOk { background: var(--st-ok); }
+.awMiniCheck { position: absolute; top: -6px; right: -6px; width: 16px; height: 16px; border-radius: 999px; background: var(--ring-gap); border: 2px solid var(--st-ok); color: var(--st-ok); display: flex; align-items: center; justify-content: center; box-sizing: border-box; }
+.awMiniPlan { background: var(--t-iele); }
+.awMiniPill { position: absolute; top: -8px; right: -8px; white-space: nowrap; height: 14px; padding: 0 5px; border-radius: 999px; background: var(--st-plan); color: #fff; border: 2px solid var(--ring-gap); box-sizing: content-box; font-family: "IBM Plex Mono", monospace; font-size: 8px; font-weight: 600; display: flex; align-items: center; }
+.awMiniOpen { background: var(--t-iele); }
+.awMiniBlocked { background: repeating-linear-gradient(135deg, var(--st-blocked-a) 0 6px, var(--st-blocked-b) 6px 12px); box-shadow: none; border: 1px solid var(--line-control); }
+
+@media (max-width: 820px) {
+  .awDialog { grid-template-columns: 1fr; }
+  .awKey { border-left: none; border-top: 1px solid var(--line); border-radius: 0 0 18px 18px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .awBackdrop, .awDialog { animation: none; }
+  .awOption { transition: none; }
 }
