@@ -1,4 +1,5 @@
 import type { CatalogRules } from "@/lib/types";
+import type { FieldAlertData } from "./DiscrepancyAlert";
 
 export interface EditorIdentity {
   programName: string;
@@ -29,6 +30,8 @@ export interface EditorCourse {
   lockedFields: string[];
   description: string;
   descriptionSyncedAt: string | null;
+  /** document-vs-API report for this row (null for rows without a real course) */
+  discrepancy: { prereq: FieldAlertData; coreq: FieldAlertData } | null;
 }
 
 export interface EditorRequirementNode {

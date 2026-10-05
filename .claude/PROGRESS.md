@@ -616,3 +616,16 @@ target now — this is for self-hosting parity.)
   then flip it back and `prisma generate` again. Neon's serverless compute
   scales to zero when idle — a "Can't reach database server" on the first
   query after a pause is normal, just retry once.
+
+## Sync from `mysql-migration` — 2026-10-04 (admin auth, Registro wizard, discrepancy alerts, visual pensum editor)
+
+`main` (this Postgres/Neon preview) now carries the same application code as `mysql-migration` at that date; only the database layer differs.
+Detailed per-session entries live in `.claude/PROGRESS.md` on `mysql-migration`; the docs travel with the code:
+[`docs/admin-auth.md`](../docs/admin-auth.md), [`docs/admin-registro-wizard.md`](../docs/admin-registro-wizard.md),
+[`docs/admin-discrepancies.md`](../docs/admin-discrepancies.md), [`docs/admin-visual-editor.md`](../docs/admin-visual-editor.md).
+- **New Postgres migration** `20261004170000_add_admin_auth_registro_import_map_edit` (generated with `prisma migrate diff` from the MySQL models;
+  purely additive: `AdminUser`, `AdminSetting`, `PasswordResetToken`, `RegistroImport`, `RegistroCourse`, `MapEdit`). `vercel-build` applies it to Neon.
+- **Admin login changed:** there is no `ADMIN_PASSWORD` any more. A fresh database is *uninitialized*: the first visitor to `/administrador/setup` creates the
+  first admin and receives the 12-word master secret. **On a public deployment, do that immediately after the first deploy.**
+- Application code is DB-portable (no raw SQL; transactions that re-check after a lock use READ COMMITTED) — rules in `docs/branches-and-releases.md`.
+

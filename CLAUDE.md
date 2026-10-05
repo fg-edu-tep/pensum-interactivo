@@ -15,7 +15,9 @@ what's next (P2 admin, P3 Docker), and the gotchas.
 
 - **Docs:** [`docs/`](docs/README.md) — branches & releases (the MySQL monolith on
   `mysql-migration` is the official release; this `main`/Vercel/Neon build is a temporary
-  preview), the October 2026 design pass, user flows.
+  preview), **admin auth** (DB-backed multi-user
+  accounts + one-time setup + 12-word master-secret super-panel — see
+  [`docs/admin-auth.md`](docs/admin-auth.md)), the October 2026 design pass, user flows, and the **admin visual pensum editor** (`/administrador/catalogos/[slug]/mapa`, [`docs/admin-visual-editor.md`](docs/admin-visual-editor.md)).
 
 ## Layout
 
@@ -42,7 +44,14 @@ npm run seed         # first load: DB from the two .xlsx + course API (~60s).
 npm run dev          # http://localhost:3000
 ```
 
+**First admin login:** there is no shared `ADMIN_PASSWORD`. On first boot the app is
+*uninitialized* — open `/administrador/setup` (first-visitor-wins) to create the first
+user and receive the 12-word master secret for the super-panel. Full flow:
+[`docs/admin-auth.md`](docs/admin-auth.md).
+
 Other scripts (all in `web/`):
+- `npm run test` — unit tests (Node's built-in runner via `tsx --test "lib/**/*.test.ts"`); includes golden tests against `Excel_Registro.xlsx` (skipped if the file is absent). The DB-backed `lib/discrepancy/__tests__/payloadEquivalence.test.ts` is skipped unless `DATABASE_URL` is set — run it with `node --env-file=.env --import tsx --test lib/discrepancy/__tests__/payloadEquivalence.test.ts`.
+- Admin data-quality docs: Registro wizard → [`docs/admin-registro-wizard.md`](docs/admin-registro-wizard.md). **Precedence + discrepancy alerts** (students see the API; the document is only a fallback; admins are alerted to differences) → [`docs/admin-discrepancies.md`](docs/admin-discrepancies.md).
 - `npm run scrape:desc` — course descriptions from smartcatalogiq → `Course.description` (standalone; the seed never touches it). Docs: `scripts/scrapeDescriptions.md`.
 - `npm run export:templates` — regenerate `plantillas/PLANES.xlsx` + `ELECTIVAS.xlsx` (coordinator import templates) from the DB. Docs: `scripts/exportTemplates.md`.
 

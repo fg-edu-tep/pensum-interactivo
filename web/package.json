@@ -13,6 +13,7 @@
     "start": "next start",
     "lint": "next lint",
     "seed": "tsx scripts/seed.ts",
+    "test": "tsx --test \"lib/**/*.test.ts\"",
     "scrape:desc": "tsx scripts/scrapeDescriptions.ts",
     "export:templates": "tsx scripts/exportTemplates.ts",
     "db:generate": "prisma generate",

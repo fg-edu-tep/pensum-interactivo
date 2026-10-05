@@ -1,15 +1,24 @@
-// Signed session cookie for the /administrador panel. Edge-compatible (Web
+// Signed session cookies for the /administrador panel. Edge-compatible (Web
 // Crypto only), so the same module works in middleware and in route handlers.
 //
+// Two cookies:
+//   pensum_admin  — proves "logged in as <username>" (12h). Payload carries the
+//                   username so the audit log + account page know who's acting.
+//   pensum_super  — proves "unlocked the super-panel with the master secret"
+//                   (short TTL). Required *in addition* to pensum_admin for the
+//                   /administrador/super area and its API.
+//
 // Token = base64url(JSON payload) + "." + base64url(HMAC-SHA256(payload, SESSION_SECRET)).
-// Payload = { sub: "admin", exp: <unix seconds> }.
 
 export const SESSION_COOKIE = "pensum_admin";
+export const SUPER_COOKIE = "pensum_super";
 export const SESSION_TTL_SECONDS = 60 * 60 * 12; // 12h
+export const SUPER_TTL_SECONDS = 60 * 30; // 30 min — re-enter the master secret after
 
-interface SessionPayload {
-  sub: string;
-  exp: number;
+export interface SessionPayload {
+  sub: string; // username (admin cookie) or "super" (super cookie)
+  kind: "admin" | "super";
+  exp: number; // unix seconds
 }
 
 const enc = new TextEncoder();
@@ -53,35 +62,87 @@ function timingSafeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
-/** Mint a fresh token valid for SESSION_TTL_SECONDS. */
-export async function createSessionToken(): Promise<string> {
-  const payload: SessionPayload = {
-    sub: "admin",
-    exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS,
-  };
+async function createToken(payload: SessionPayload): Promise<string> {
   const body = b64urlEncode(enc.encode(JSON.stringify(payload)));
   return `${body}.${await sign(body)}`;
 }
 
-/** True when the token's signature checks out and it hasn't expired. */
-export async function verifySessionToken(token: string | undefined | null): Promise<boolean> {
-  if (!token) return false;
+/** Decode + verify a token; returns the payload if the signature + expiry hold. */
+export async function readToken(
+  token: string | undefined | null
+): Promise<SessionPayload | null> {
+  if (!token) return null;
   const dot = token.lastIndexOf(".");
-  if (dot <= 0) return false;
+  if (dot <= 0) return null;
   const body = token.slice(0, dot);
   const sig = token.slice(dot + 1);
   try {
-    if (!timingSafeEqual(sig, await sign(body))) return false;
+    if (!timingSafeEqual(sig, await sign(body))) return null;
     const payload = JSON.parse(
       new TextDecoder().decode(b64urlDecode(body))
     ) as SessionPayload;
-    return payload.sub === "admin" && payload.exp > Math.floor(Date.now() / 1000);
+    if (payload.exp <= Math.floor(Date.now() / 1000)) return null;
+    return payload;
   } catch {
-    return false;
+    return null;
   }
 }
 
+// --- admin session (logged-in user) ---
+
+/** Mint a session token for a logged-in user. */
+export async function createSessionToken(username: string): Promise<string> {
+  return createToken({
+    sub: username,
+    kind: "admin",
+    exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS,
+  });
+}
+
+/** Backwards-friendly boolean check used by the Edge middleware. */
+export async function verifySessionToken(
+  token: string | undefined | null
+): Promise<boolean> {
+  const p = await readToken(token);
+  return !!p && p.kind === "admin";
+}
+
+/** The username carried by a valid admin token, or null. */
+export async function sessionUsername(
+  token: string | undefined | null
+): Promise<string | null> {
+  const p = await readToken(token);
+  return p && p.kind === "admin" ? p.sub : null;
+}
+
+// --- super session (master-secret unlock) ---
+
+export async function createSuperToken(): Promise<string> {
+  return createToken({
+    sub: "super",
+    kind: "super",
+    exp: Math.floor(Date.now() / 1000) + SUPER_TTL_SECONDS,
+  });
+}
+
+export async function verifySuperToken(
+  token: string | undefined | null
+): Promise<boolean> {
+  const p = await readToken(token);
+  return !!p && p.kind === "super";
+}
+
 export function sessionCookieOptions(maxAgeSeconds = SESSION_TTL_SECONDS) {
+  return {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: maxAgeSeconds,
+  };
+}
+
+export function superCookieOptions(maxAgeSeconds = SUPER_TTL_SECONDS) {
   return {
     httpOnly: true,
     sameSite: "lax" as const,

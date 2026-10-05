@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import DiscrepancyAlert from "./DiscrepancyAlert";
 import {
   COURSE_TYPES,
   PAIRING_LABEL,
@@ -293,6 +294,18 @@ export default function CourseRow({ slug, course, prevId, nextId }: Props) {
           value={f.prereqText}
           onChange={(e) => setF({ ...f, prereqText: e.target.value })}
         />
+        {course.discrepancy && course.discrepancy.prereq.status !== "match" && (
+          <DiscrepancyAlert field={course.discrepancy.prereq} compact={course.discrepancy.prereq.status === "unverified"} />
+        )}
+        {course.discrepancy && course.discrepancy.coreq.severity === "warn" && (
+          <DiscrepancyAlert field={course.discrepancy.coreq} />
+        )}
+        {f.prereqText !== orig.prereqText && course.discrepancy?.prereq.governor === "api" && (
+          <div className="disc-alert warn" role="status">
+            ⚠ Este curso tiene datos oficiales de la API: aunque guardes este cambio, los estudiantes seguirán viendo los
+            de la API. Solo se usa este valor si la API no tiene datos del curso.
+          </div>
+        )}
       </div>
 
       {!course.isPlaceholder && course.normalizedCode && (
