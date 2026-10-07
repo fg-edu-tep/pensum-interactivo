@@ -38,6 +38,7 @@ model Catalog {
   courses          CatalogCourse[]
   requirementNodes RequirementNode[]
   snapshots        CatalogSnapshot[]
+  mapEdits         MapEdit[]
   importJobs       ImportJob[]
 
   @@index([status])
@@ -242,4 +243,127 @@ model AuditLog {
   before     Json?
   after      Json?
   createdAt  DateTime @default(now())
+}
+
+/// An admin/coordinator account for the /administrador panel. Every user has
+/// identical full access — there are no roles. Passwords are scrypt-hashed
+/// (see lib/auth/password.ts). The super-admin (master-secret holder) manages
+/// these from /administrador/super.
+model AdminUser {
+  id           Int       @id @default(autoincrement())
+  username     String    @unique // case-insensitive compare done in code (lowercased)
+  displayName  String?
+  passwordHash String // scrypt derived key, hex
+  passwordSalt String // per-user random salt, hex
+  disabled     Boolean   @default(false)
+  mustReset    Boolean   @default(false) // set when the super-admin resets the password
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  resetTokens PasswordResetToken[]
+
+  @@index([disabled])
+}
+
+/// Singleton-ish key/value store for auth bootstrap state. Rows today:
+///   "master_secret_hash"  — scrypt hash of the normalized 12-word mnemonic
+///   "master_secret_salt"  — its salt
+///   "setup_completed_at"  — ISO timestamp; its presence closes the setup URL
+/// (first-visitor-wins: setup is reachable only while no users exist AND this
+///  key is unset).
+model AdminSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+/// A single-use password reset grant minted by the super-admin for a locked-out
+/// user. The super-admin hands the raw token (or a chosen temp password) to the
+/// user out-of-band; only its hash is stored.
+model PasswordResetToken {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  tokenHash String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdBy String? // actor who issued it ("super")
+  createdAt DateTime  @default(now())
+
+  user AdminUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// One run of the Registro import wizard (docs/admin-registro-wizard.md).
+/// The uploaded Excel_Registro.xlsx is kept as `fileBytes` while the run is open
+/// so the admin can change the scope/term window (re-reduce = re-parse, ~7 s);
+/// it is nulled on apply/discard. The reduced dictionary lives in RegistroCourse
+/// and — for the latest `applied` run — doubles as the code dictionary that the
+/// Phase B editor uses for autocomplete/validation.
+model RegistroImport {
+  id          Int       @id @default(autoincrement())
+  filename    String
+  uploadedBy  String
+  status      String    @default("parsed") // parsed | applied | discarded
+  fileBytes   Bytes?
+  /// ScopeOptions used for the current reduction
+  scope       Json
+  /// TermWindow of the current reduction
+  termWindow  Json?
+  parseStats  Json?
+  reduceStats Json?
+  /// { [itemKey]: Resolution } — the admin's decisions in step 3
+  resolutions Json?
+  /// result summary written on apply (per-catalog counts, snapshot ids)
+  applyResult Json?
+  createdAt   DateTime  @default(now())
+  appliedAt   DateTime?
+
+  courses RegistroCourse[]
+
+  @@index([status])
+}
+
+/// Reduced dictionary row: the newest in-window record of one course code.
+model RegistroCourse {
+  id             Int     @id @default(autoincrement())
+  importId       Int
+  normalizedCode String
+  displayCode    String
+  nameEs         String
+  credits        Float?
+  departamento   String
+  nivel          String
+  period         String
+  prereqText     String?
+  coreqText      String?
+  restrictions   Json?
+  /// matched the department/level scope (vs. pulled in by reference)
+  isCore         Boolean @default(false)
+
+  import RegistroImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+
+  @@unique([importId, normalizedCode])
+  @@index([normalizedCode])
+}
+
+/// Phase B (visual editor): one applied canvas batch. `undo` holds the exact
+/// per-row before/after (incl. SQL NULL vs JSON null) so the batch can be reverted.
+model MapEdit {
+  id         Int       @id @default(autoincrement())
+  catalogId  Int
+  actor      String
+  /// the MapOp[] as submitted
+  ops        Json
+  /// { rows: UndoRow[], pinned: ..., snapshotId }
+  undo       Json
+  snapshotId Int?
+  status     String    @default("applied") // applied | undone
+  createdAt  DateTime  @default(now())
+  undoneAt   DateTime?
+
+  catalog Catalog @relation(fields: [catalogId], references: [id], onDelete: Cascade)
+
+  @@index([catalogId])
 }

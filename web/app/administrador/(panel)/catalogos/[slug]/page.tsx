@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { buildDiscrepancyReports } from "@/lib/discrepancy/service";
 import type { CatalogRules } from "@/lib/types";
 import CatalogEditor from "@/components/admin/CatalogEditor";
 
@@ -31,6 +32,18 @@ export default async function CatalogEditorPage({
     },
   });
   if (!catalog) notFound();
+
+  // document-vs-official-API report for this plan's rows (strip the tree: it is not serialisable UI data)
+  const [disc] = await buildDiscrepancyReports([slug]);
+  const discById = new Map(
+    (disc?.courses ?? []).map((c) => {
+      const { visible: _p, ...prereq } = c.prereq;
+      const { visible: _c, ...coreq } = c.coreq;
+      void _p;
+      void _c;
+      return [c.catalogCourseId, { prereq, coreq }] as const;
+    })
+  );
 
   const rules = (catalog.rules as CatalogRules | null) ?? {
     gates: [],
@@ -69,6 +82,7 @@ export default async function CatalogEditorPage({
       descriptionSyncedAt: c.course?.descriptionSyncedAt
         ? c.course.descriptionSyncedAt.toISOString()
         : null,
+      discrepancy: discById.get(c.id) ?? null,
     })),
     requirementNodes: catalog.requirementNodes.map((n) => ({
       id: n.id,
@@ -88,7 +102,8 @@ export default async function CatalogEditorPage({
   return (
     <>
       <p className="admin-sub">
-        <Link href="/administrador">← Catálogos</Link>
+        <Link href="/administrador">← Catálogos</Link> ·{" "}
+        <Link href={`/administrador/catalogos/${slug}/mapa`}>Abrir mapa visual →</Link>
       </p>
       <h1>
         {catalog.programName}

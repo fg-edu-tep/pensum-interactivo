@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+import { buildDiscrepancyReports } from "@/lib/discrepancy/service";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,7 @@ const PAIR_LABEL: Record<string, string> = {
 };
 
 export default async function CatalogListPage() {
-  const [catalogs, pairRows, lastImport] = await Promise.all([
+  const [catalogs, pairRows, lastImport, discReports] = await Promise.all([
     prisma.catalog.findMany({
       orderBy: { slug: "asc" },
       include: { _count: { select: { courses: true, requirementNodes: true } } },
@@ -31,7 +32,9 @@ export default async function CatalogListPage() {
       _count: { _all: true },
     }),
     prisma.importJob.findFirst({ orderBy: { uploadedAt: "desc" } }),
+    buildDiscrepancyReports(),
   ]);
+  const warnBySlug = new Map(discReports.map((r) => [r.slug, r.summary.warn]));
 
   const pairByCatalog = new Map<number, Record<string, number>>();
   for (const row of pairRows) {
@@ -60,6 +63,7 @@ export default async function CatalogListPage() {
             <th>Término</th>
             <th>Cursos</th>
             <th>Emparejamiento</th>
+            <th>Discrepancias</th>
             <th />
           </tr>
         </thead>
@@ -93,11 +97,33 @@ export default async function CatalogListPage() {
                   ))}
                 </td>
                 <td>
+                  {(() => {
+                    const n = warnBySlug.get(c.slug) ?? 0;
+                    return n > 0 ? (
+                      <Link
+                        className="disc-badge"
+                        href={`/administrador/discrepancias?catalogo=${c.slug}`}
+                        title="El documento difiere de los datos oficiales de la API"
+                      >
+                        ⚠ {n}
+                      </Link>
+                    ) : (
+                      <span className="disc-badge zero">sin advertencias</span>
+                    );
+                  })()}
+                </td>
+                <td>
                   <Link
                     className="admin-btn"
                     href={`/administrador/catalogos/${c.slug}`}
                   >
                     Editar
+                  </Link>{" "}
+                  <Link
+                    className="admin-btn"
+                    href={`/administrador/catalogos/${c.slug}/mapa`}
+                  >
+                    Mapa
                   </Link>
                 </td>
               </tr>

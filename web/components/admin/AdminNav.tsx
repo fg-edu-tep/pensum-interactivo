@@ -6,13 +6,17 @@ import { usePathname, useRouter } from "next/navigation";
 const LINKS = [
   { href: "/administrador", label: "Catálogos", exact: true },
   { href: "/administrador/importar", label: "Importar" },
+  { href: "/administrador/registro", label: "Registro" },
+  { href: "/administrador/discrepancias", label: "Discrepancias" },
   { href: "/administrador/electivas", label: "Electivas" },
   { href: "/administrador/descripciones", label: "Descripciones" },
   { href: "/administrador/requisitos", label: "Requisitos de grado" },
   { href: "/administrador/auditoria", label: "Auditoría" },
+  { href: "/administrador/super", label: "Super-panel" },
+  { href: "/administrador/cuenta", label: "Mi cuenta" },
 ];
 
-export default function AdminNav() {
+export default function AdminNav({ username }: { username?: string | null }) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -41,6 +45,11 @@ export default function AdminNav() {
         );
       })}
       <div className="admin-side-spacer" />
+      {username && (
+        <div className="admin-side-user">
+          Conectado como <strong>{username}</strong>
+        </div>
+      )}
       <button className="admin-logout" onClick={logout}>
         Cerrar sesión
       </button>
