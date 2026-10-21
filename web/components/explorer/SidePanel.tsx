@@ -9,6 +9,7 @@ import type {
   OfferingBadge,
 } from "@/lib/types";
 import ElectivePicker from "./ElectivePicker";
+import EngineeringElectivePicker from "./EngineeringElectivePicker";
 import ChainMiniature from "./ChainMiniature";
 import RequirementTree from "./RequirementTree";
 import { groupClass, groupColor, groupOf, spaceCode, toSentenceCase, nextTermCode, nextTermShort, termShort } from "./format";
@@ -18,6 +19,17 @@ import styles from "./explorer.module.css";
 const CBU_OFERTA_URL = "https://educaciongeneral.uniandes.edu.co/cbu/";
 const OFERTA_CURSOS_URL = "https://ofertadecursos.uniandes.edu.co/";
 const ELECTIVE_SLOT_KINDS = new Set(["ELECTIVA", "EFI", "CI"]);
+
+/** "Electiva en Fundamentos de Ingeniería" — classified EFI, or an ELECTIVA
+ * slot whose label says so ("ELECTIVA EN FUND. ING."). */
+function isEfiSlot(course: Course): boolean {
+  if (course.placeholderKind === "EFI") return true;
+  const label = `${course.placeholderLabel ?? ""} ${course.name}`
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase();
+  return /FUNDAMENTOS? DE INGENIER|FUND\.? ?(DE )?ING/.test(label);
+}
 
 const TYPE_LABEL: Record<Course["type"], string> = {
   nucleo: "Núcleo",
@@ -49,6 +61,22 @@ function DescriptionBlock({ text }: { text: string }) {
       )}
     </div>
   );
+}
+
+/** Where the requirements shown come from (lib/requirementResolve.ts priority). */
+function sourceLine(course: Course, term: string): string | null {
+  switch (course.prereqSource) {
+    case "api":
+      return `Requisitos según la oferta oficial de ${termShort(term)}.`;
+    case "document":
+      return "Requisitos según el documento del programa (no hay datos de la oferta en línea para este periodo).";
+    case "registro":
+      return `Requisitos según Registro${course.prereqSourceTerm ? ` (${termShort(course.prereqSourceTerm)})` : ""}: este curso no tiene datos en la oferta de ${termShort(term)}.`;
+    case "api-history":
+      return `Requisitos según la oferta oficial de ${termShort(course.prereqSourceTerm ?? "")}, la última vez que se dictó.`;
+    default:
+      return null;
+  }
 }
 
 function seatsText(seats: [number, number] | undefined): string {
@@ -277,6 +305,7 @@ export default function SidePanel({
               approved={approved}
               onSelectCourse={onSelectCourse}
             />
+            {sourceLine(course, term) && <p className={styles.requirementSource}>{sourceLine(course, term)}</p>}
           </div>
         )}
 
@@ -306,7 +335,19 @@ export default function SidePanel({
 
         {course.description && <DescriptionBlock text={course.description} />}
 
-        {isElectiveSlot && (
+        {isElectiveSlot && isEfiSlot(course) && (
+          <div className={styles.slotPanelSection}>
+            <EngineeringElectivePicker
+              term={term}
+              mode={mode}
+              assignment={assignment}
+              slotCredits={course.credits}
+              onAssign={(a) => onAssignElective(course.id, a)}
+            />
+          </div>
+        )}
+
+        {isElectiveSlot && !isEfiSlot(course) && (
           <div className={styles.slotPanelSection}>
             <ElectivePicker
               electives={electives}

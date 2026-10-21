@@ -119,6 +119,7 @@ async function main() {
         `auto=${res.pairing.auto_paired} not_offered=${res.pairing.not_offered} ` +
         `manual=${res.pairing.needs_manual} pool=${res.pairing.placeholder_pool} ` +
         `sync_failed=${res.pairing.sync_failed} details=${res.detailsPaired}` +
+        (res.requirementGapsFilled > 0 ? ` req_filled=${res.requirementGapsFilled}` : "") +
         (res.apiFailureRate > 0 ? `  (api fail ${(res.apiFailureRate * 100).toFixed(0)}%)` : "")
     );
   }

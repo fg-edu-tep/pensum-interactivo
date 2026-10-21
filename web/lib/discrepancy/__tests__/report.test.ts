@@ -132,11 +132,16 @@ test("coreq: API synced with no coreq but the document lists one => doc-hidden",
 });
 
 // ------------------------------------------------------------------- wording
-test("headline: coreq differences warn that the basket still shows the document's coreq text", () => {
-  const h = headlineFor({ field: "coreq", status: "differs", documentText: "IELE-2100L" });
-  assert.match(h, /canasta/);
-  assert.doesNotMatch(headlineFor({ field: "coreq", status: "differs", documentText: "" }), /canasta/);
-  assert.doesNotMatch(headlineFor({ field: "prereq", status: "differs", documentText: "IELE 1001" }), /canasta/);
+test("headline: no basket caveat any more — every student surface shows the winning source's text", () => {
+  assert.doesNotMatch(headlineFor({ field: "coreq", status: "differs", documentText: "IELE-2100L" }), /canasta/);
+});
+
+test("headline: unverified names the secondary source students see", () => {
+  const reg = headlineFor({ field: "prereq", status: "unverified", documentText: "", unverifiedReason: "not-offered", source: "registro", sourceTerm: "202610" });
+  assert.match(reg, /Registro \(2026-1\)/);
+  const hist = headlineFor({ field: "prereq", status: "unverified", documentText: "", unverifiedReason: "no-offering", source: "api-history", sourceTerm: "202610" });
+  assert.match(hist, /API de 2026-1/);
+  assert.match(headlineFor({ field: "prereq", status: "unverified", documentText: "", source: null }), /ninguna fuente/);
 });
 
 test("headline: every status has a sentence; unverified names its reason", () => {
@@ -146,20 +151,32 @@ test("headline: every status has a sentence; unverified names its reason", () =>
   assert.match(headlineFor({ field: "prereq", status: "unverified", documentText: "", unverifiedReason: "not-offered" }), /no se dicta/);
 });
 
-// ----------------------------------------------- student-visible text (mirror)
-test("visibleText mirrors the payload: prereq text = API text only when the API has a TREE, else the document's", () => {
-  // API none + document has text => payload still shows the document's text
+// ------------------------------------------------- student-visible text
+test("visibleText follows the winning source: API none => empty text (no stale document text)", () => {
   const hidden = reportField(course({ docPrereqText: "IELE 1001", docPrereqTree: t("IELE 1001") }), "prereq");
-  assert.equal(hidden.visibleText, "IELE 1001");
-  assert.equal(hidden.visible, null); // ...while the tree students get is empty
-  // API has a tree => its text
+  assert.equal(hidden.visibleText, "");
+  assert.equal(hidden.visible, null);
   const api = reportField(course({ docPrereqText: "doc", offering: off({ apiPrereqText: "IELE 2000", apiPrereqTree: t("IELE 2000") }) }), "prereq");
   assert.equal(api.visibleText, "IELE 2000");
 });
 
-test("visibleText mirrors the payload: coreq text is ALWAYS the document's", () => {
+test("visibleText follows the winning source for coreqs too", () => {
   const f = reportField(course({ docCoreqText: "IELE-2100L", docCoreqTree: t("IELE 2100L"), offering: off({ apiCoreqTree: t("IELE 2100L") }) }), "coreq");
-  assert.equal(f.visibleText, "IELE-2100L");
+  assert.equal(f.visibleText, "IELE 2100L");
+  const doc = reportField(course({ docCoreqText: "IELE-2100L", docCoreqTree: t("IELE 2100L"), offering: null }), "coreq");
+  assert.equal(doc.visibleText, "IELE-2100L");
+});
+
+test("fallback: not offered this term + empty document => the Registro entry governs (IELE 3206 case)", () => {
+  const f = reportField(
+    course({
+      offering: off({ offered: false, detailsSyncedAt: null }),
+      registro: { period: "202610", prereqText: "IELE 2206 Y (LENG 2999 O ENGL7 )", coreqText: "IELE-3206L" },
+    }),
+    "prereq"
+  );
+  assert.deepEqual([f.governor, f.source, f.sourceTerm, f.status], ["document", "registro", "202610", "unverified"]);
+  assert.ok(f.visible);
 });
 
 // ------------------------------------------------------------------- summary

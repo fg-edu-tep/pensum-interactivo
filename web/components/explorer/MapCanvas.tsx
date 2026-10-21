@@ -17,7 +17,7 @@ import { upstreamOf, downstreamOf, unlockRelation } from "@/lib/availability";
 import { numberRequirementGroups } from "./reqGroups";
 import { toSentenceCase } from "./format";
 import CourseCard, { type RelationState } from "./CourseCard";
-import RelationToggles, { deriveUnlockView, type RelView } from "./UnlockViewControl";
+import RelationToggles, { activeRelKey, deriveUnlockView, type RelView } from "./UnlockViewControl";
 import { PlusIcon, MinusIcon, FitIcon } from "./icons";
 import styles from "./explorer.module.css";
 
@@ -173,7 +173,7 @@ export default function MapCanvas({
 }: Props) {
   const { PREREQ_COLOR, CHAIN_COLOR, COREQ_COLOR, UNLOCK_SOLE_COLOR, UNLOCK_AMONG_COLOR } = useEdgeColors();
   const unlockView = deriveUnlockView(view);
-  const showNeeds = view.needs;
+  const showNeeds = activeRelKey(view) === "needs";
   const catalogCodes = useMemo(() => new Set(courses.map((c) => c.codeNormalized)), [courses]);
   const byId = useMemo(() => new Map(courses.map((c) => [c.id, c])), [courses]);
 
@@ -557,7 +557,7 @@ export default function MapCanvas({
         // The dock keeps clear of the lower-left controls (zoom + basket button)
         // however wide the card gets; only the card itself takes clicks.
         <div className={styles.selDock}>
-          <div className={styles.selCard} role="region" aria-label={`Selección: ${selected.code}`}>
+          <div className={styles.selCard} role="region" aria-label={`Selección: ${selected.code}`} data-tour="reltoggle">
             <div className={styles.selHead}>
               <span className={styles.selCode}>{selected.code}</span>
               <span className={styles.selName}>{toSentenceCase(selected.name)}</span>

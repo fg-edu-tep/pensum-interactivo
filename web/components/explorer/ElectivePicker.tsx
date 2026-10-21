@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { termLabel as termShort } from "@/lib/term";
 import type {
   ElectiveAssignment,
@@ -24,7 +24,27 @@ interface Props {
   onAssign: (a: ElectiveAssignment | null) => void;
 }
 
-type Era = "from2024" | "until2023";
+/** Live-offering enrichment for one bag elective (/api/electives/enrich). */
+interface Enriched {
+  code: string;
+  title: string;
+  credits: number | null;
+  sectionCount: number;
+}
+type Enrichment = { apiAvailable: boolean; matches: Record<number, Enriched> };
+
+// one request per term per page load, shared by every picker instance
+const enrichmentCache = new Map<string, Promise<Enrichment>>();
+function loadEnrichment(term: string): Promise<Enrichment> {
+  let p = enrichmentCache.get(term);
+  if (!p) {
+    p = fetch(`/api/electives/enrich?term=${encodeURIComponent(term)}`)
+      .then((r) => (r.ok ? (r.json() as Promise<Enrichment>) : { apiAvailable: false, matches: {} }))
+      .catch(() => ({ apiAvailable: false, matches: {} }));
+    enrichmentCache.set(term, p);
+  }
+  return p;
+}
 
 const ROLE_LABEL: Record<string, string> = {
   obligatoria: "Obligatoria",
@@ -58,7 +78,9 @@ export default function ElectivePicker({
   integradorOnly = false,
   onAssign,
 }: Props) {
-  const [era, setEra] = useState<Era>("from2024");
+  // Only the 2024-I+ pensum is served: the bag's "until 2023" role columns
+  // are ignored.
+  const [enrichment, setEnrichment] = useState<Enrichment | null>(null);
   const [onlyThisTerm, setOnlyThisTerm] = useState(true);
   const [q, setQ] = useState("");
   const [resolvingId, setResolvingId] = useState<number | null>(null);
@@ -71,8 +93,28 @@ export default function ElectivePicker({
   );
   const tShort = termShort(term);
 
+  useEffect(() => {
+    let alive = true;
+    loadEnrichment(term).then((d) => alive && setEnrichment(d));
+    return () => {
+      alive = false;
+    };
+  }, [term]);
+
   async function pick(e: ElectiveDTO) {
     setResolveError(null);
+    // Priority: the Excel bag is the list; the live offering adds code and
+    // credits when it matched. With the API reachable but no match, the Excel
+    // data alone is assigned.
+    const m = enrichment?.matches[e.id];
+    if (m) {
+      onAssign({ code: m.code, title: m.title || e.name, credits: m.credits ?? slotCredits, sectionCount: m.sectionCount, electiveId: e.id });
+      return;
+    }
+    if (enrichment?.apiAvailable) {
+      onAssign({ code: e.code, title: e.name, credits: slotCredits, electiveId: e.id });
+      return;
+    }
     setResolvingId(e.id);
     try {
       const res = await fetch(
@@ -113,9 +155,8 @@ export default function ElectivePicker({
 
 
   const rolesFor = (e: ElectiveDTO): RoleCell[] => {
-    const suffix = era === "from2024" ? "From2024" : "Until2023";
-    const ele = e.roles[("ele" + suffix) as keyof ElectiveDTO["roles"]];
-    const elc = e.roles[("elc" + suffix) as keyof ElectiveDTO["roles"]];
+    const ele = e.roles.eleFrom2024;
+    const elc = e.roles.elcFrom2024;
     if (programCode === "IELC") return [elc];
     if (programCode === "DOBLE") return [ele, elc];
     return [ele];
@@ -131,7 +172,8 @@ export default function ElectivePicker({
         if (cells.length === 0) return false;
         if (wantRole && !cells.some((c) => c.norm === wantRole)) return false;
       }
-      if (onlyThisTerm && !e.offeredTerms.includes(term)) return false;
+      // "offered this term": the Excel's curated list, or a live-offering match
+      if (onlyThisTerm && !e.offeredTerms.includes(term) && !enrichment?.matches[e.id]) return false;
       if (needle) {
         const hay = foldAccents(`${e.name} ${e.ciclo ?? ""}`);
         if (!hay.includes(needle)) return false;
@@ -139,12 +181,11 @@ export default function ElectivePicker({
       return true;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [electives, era, onlyThisTerm, q, wantRole, term, programCode, integradorOnly]);
+  }, [electives, onlyThisTerm, q, wantRole, term, programCode, integradorOnly, enrichment]);
 
   const roleChips = (e: ElectiveDTO) => {
-    const suffix = era === "from2024" ? "From2024" : "Until2023";
-    const ele = e.roles[("ele" + suffix) as keyof ElectiveDTO["roles"]];
-    const elc = e.roles[("elc" + suffix) as keyof ElectiveDTO["roles"]];
+    const ele = e.roles.eleFrom2024;
+    const elc = e.roles.elcFrom2024;
     const chips: { key: string; text: string; title: string }[] = [];
     if ((programCode === "IELE" || programCode === "DOBLE") && ele?.norm)
       chips.push({
@@ -207,24 +248,6 @@ export default function ElectivePicker({
       )}
 
       <div className="elective-filters">
-        {!integradorOnly && (
-          <div className="elective-era" role="tablist" aria-label="Era del pensum">
-            <button
-              type="button"
-              className={era === "from2024" ? "active" : ""}
-              onClick={() => setEra("from2024")}
-            >
-              Pensum 2024-I+
-            </button>
-            <button
-              type="button"
-              className={era === "until2023" ? "active" : ""}
-              onClick={() => setEra("until2023")}
-            >
-              Hasta 2023-II
-            </button>
-          </div>
-        )}
         <label className="elective-term-toggle">
           <input
             type="checkbox"
@@ -254,6 +277,7 @@ export default function ElectivePicker({
               ? `${mihorarioUrl}${mihorarioUrl.includes("?") ? "&" : "?"}nameInput=${encodeURIComponent(e.name)}`
               : null;
             const isChosen = assignment?.electiveId === e.id;
+            const live = enrichment?.matches[e.id];
             return (
               <li
                 className={`elective-row${isChosen ? " is-chosen" : ""}`}
@@ -261,10 +285,27 @@ export default function ElectivePicker({
               >
                 <div className="elective-row-head">
                   <span className="elective-name">{e.name}</span>
-                  {e.offeredTerms.includes(term) && (
+                  {(e.offeredTerms.includes(term) || !!live) && (
                     <span className="chip ptrm">{tShort}</span>
                   )}
                 </div>
+                {live ? (
+                  <div className="elective-live">
+                    <span className="elective-live-code">{live.code}</span>
+                    {live.credits != null && <span>{live.credits} cr</span>}
+                    <span>
+                      {live.sectionCount} secc. en {tShort}
+                    </span>
+                  </div>
+                ) : (
+                  enrichment && (
+                    <div className="elective-live is-missing">
+                      {enrichment.apiAvailable
+                        ? `Sin coincidencia en la oferta de ${tShort}: datos de la bolsa de electivas`
+                        : "Oferta en línea no disponible: datos de la bolsa de electivas"}
+                    </div>
+                  )
+                )}
                 <div className="chip-row">
                   {roleChips(e).map((c) => (
                     <span className="chip" key={c.key} title={c.title}>

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { sortCatalogs } from "@/lib/catalogOrder";
 import CatalogPicker, { type PickerCatalog } from "@/components/CatalogPicker";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +22,7 @@ export default async function CatalogPickerPage() {
     },
   });
 
-  const catalogs: PickerCatalog[] = rows.map((c) => ({
+  const catalogs: PickerCatalog[] = sortCatalogs(rows).map((c) => ({
     slug: c.slug,
     programName: c.programName,
     programCode: c.programCode,

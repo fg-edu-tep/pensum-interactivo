@@ -5,6 +5,7 @@
 
 import { prisma } from "./db";
 import { termLabel } from "./term";
+import { sortCatalogs } from "./catalogOrder";
 import type {
   CatalogPayload,
   CatalogRules,
@@ -37,6 +38,8 @@ function softOnlyCodes(node: ReqNode | null, hard = new Set<string>(), soft = ne
   return soft;
 }
 import { normalizeCode } from "./import/normalizeCode";
+import { requirementCandidates, loadRegistroDictionary } from "./requirementSources";
+import { resolveRequirement } from "./requirementResolve";
 
 function placeholderId(kind: string | null, semester: number, n: number): string {
   return `ph-${(kind ?? "slot").toLowerCase()}-s${semester}-${n}`;
@@ -78,39 +81,30 @@ export async function buildCatalogPayload(slug: string): Promise<CatalogPayload 
   const catalogCodes = new Set(rows.map((r) => r.codeNormalized));
   const idByCode = new Map(rows.map((r) => [r.codeNormalized, r.id]));
 
+  const registro = await loadRegistroDictionary(
+    rows.filter((r) => !r.cc.isPlaceholder).map((r) => r.codeNormalized)
+  );
+
   const courses: Course[] = rows.map(({ cc, id, codeNormalized }) => {
-    // Live courseDetails (this term) is the source of truth for requirements;
-    // the PRERREQUISITOS spreadsheet is the fallback for courses with no
-    // offering this term (or when the details fetch failed).
+    // Requirements follow ONE priority (lib/requirementResolve.ts): live API
+    // for this term → the plan's document data → the Registro upload → the
+    // API data of another term. An empty source is skipped.
     const off = cc.course?.offerings?.find((o) => o.term === catalog.term);
-    const detailsFetched = !!off?.detailsSyncedAt && !off?.detailsError;
-
-    const apiPrereqTree = (off?.apiPrereqTree as ReqNode | null | undefined) ?? null;
-    const docPrereqTree = (cc.prereqTree as ReqNode | null) ?? null;
-    const prereqTree =
-      apiPrereqTree ??
-      (detailsFetched && !off?.apiPrereqText ? null : docPrereqTree);
-    const prereqSource: RequirementSource = apiPrereqTree
-      ? "api"
-      : detailsFetched && !off?.apiPrereqText
-        ? "api"
-        : docPrereqTree
-          ? "document"
-          : null;
-    const prereqText = apiPrereqTree
-      ? (off?.apiPrereqText ?? "")
-      : (cc.prereqText ?? "");
-
-    const apiCoreqTree = (off?.apiCoreqTree as ReqNode | null | undefined) ?? null;
-    const docCoreqTree = (cc.coreqTree as ReqNode | null) ?? null;
-    const coreqTree = apiCoreqTree ?? (detailsFetched ? null : docCoreqTree);
-    const coreqSource: RequirementSource = apiCoreqTree
-      ? "api"
-      : detailsFetched
-        ? "api"
-        : docCoreqTree
-          ? "document"
-          : null;
+    const candidates = cc.isPlaceholder
+      ? requirementCandidates(cc, null, null, [])
+      : requirementCandidates(
+          cc,
+          off ?? null,
+          registro.get(codeNormalized) ?? null,
+          (cc.course?.offerings ?? []).filter((o) => o.term !== catalog.term)
+        );
+    const pre = resolveRequirement("prereq", candidates);
+    const co = resolveRequirement("coreq", candidates);
+    const prereqTree = pre.tree;
+    const prereqSource: RequirementSource = pre.source;
+    const prereqText = pre.text;
+    const coreqTree = co.tree;
+    const coreqSource: RequirementSource = co.source;
 
     const apiCoreq =
       (off?.apiCoreq as { normalizedCode: string; title: string }[] | null) ?? [];
@@ -151,7 +145,7 @@ export async function buildCatalogPayload(slug: string): Promise<CatalogPayload 
       placeholderLabel: cc.placeholderLabel,
       description: cc.course?.description ?? null,
       prereqText,
-      coreqText: cc.coreqText ?? "",
+      coreqText: co.text,
       prereqTree,
       prereqCourseIds,
       concurrentPrereqIds,
@@ -161,6 +155,8 @@ export async function buildCatalogPayload(slug: string): Promise<CatalogPayload 
       coreqExternal,
       prereqSource,
       coreqSource,
+      prereqSourceTerm: pre.sourceTerm,
+      coreqSourceTerm: co.sourceTerm,
       coreqTitles,
       restrictions,
     };
@@ -243,11 +239,13 @@ export async function buildCatalogPayload(slug: string): Promise<CatalogPayload 
     };
   }
 
-  const siblings = await prisma.catalog.findMany({
-    where: { status: "published", NOT: { slug } },
-    select: { slug: true, variantLabel: true, programName: true },
-    orderBy: [{ programCode: "asc" }, { slug: "asc" }],
-  });
+  const siblings = sortCatalogs(
+    await prisma.catalog.findMany({
+      where: { status: "published", NOT: { slug } },
+      select: { slug: true, variantLabel: true, programName: true },
+      orderBy: [{ programCode: "asc" }, { slug: "asc" }],
+    })
+  );
 
   const electiveRows = await prisma.elective.findMany({ orderBy: { name: "asc" } });
   const electives: ElectiveDTO[] = electiveRows.map((e) => ({

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { sortCatalogs } from "@/lib/catalogOrder";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,7 @@ export async function GET() {
     },
   });
   return NextResponse.json({
-    catalogs: catalogs.map((c) => ({
+    catalogs: sortCatalogs(catalogs).map((c) => ({
       slug: c.slug,
       programCode: c.programCode,
       programName: c.programName,

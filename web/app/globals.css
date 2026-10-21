@@ -1442,23 +1442,17 @@ a {
   margin-bottom: 8px;
 }
 
-.elective-era {
+/* live-offering enrichment line under a bag elective */
+.elective-live {
   display: flex;
-  border: 1px solid #d1d5db;
-  border-radius: 7px;
-  overflow: hidden;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 11.5px;
+  color: #065f46;
 }
-.elective-era button {
-  border: none;
-  background: #fff;
-  padding: 5px 9px;
-  font-size: 11px;
-  color: #374151;
-}
-.elective-era button.active {
-  background: #111827;
-  color: #fff;
-}
+.elective-live-code { font-family: "IBM Plex Mono", monospace; font-weight: 600; }
+.elective-live.is-missing { color: #6b7280; }
 
 .elective-term-toggle {
   display: flex;
@@ -1599,3 +1593,10 @@ a {
   color: #6b7280;
   margin: 0 0 10px;
 }
+
+/* EFI slot: type any engineering code */
+.efi-form { margin: 0 0 8px; }
+.efi-label { display: block; font-size: 12px; font-weight: 600; color: #374151; margin-bottom: 4px; }
+.efi-row { display: flex; gap: 6px; align-items: stretch; }
+.efi-row .elective-search { flex: 1; margin: 0; }
+.efi-row .elective-search[aria-invalid="true"] { border-color: #f59e0b; }

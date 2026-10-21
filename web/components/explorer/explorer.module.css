@@ -591,33 +591,50 @@
 }
 .selNote { margin: 0; font-size: 12.5px; line-height: 1.4; color: var(--muted); }
 
-/* the three relation checkboxes */
-.relToggles { display: flex; flex-wrap: wrap; gap: 6px; }
-.relToggle {
+/* the three relation views: a segmented, single-choice toggle */
+.relBlock { display: flex; flex-direction: column; gap: 6px; }
+.relSegment {
+  display: flex;
+  padding: 3px;
+  gap: 2px;
+  border: 1px solid var(--line-control);
+  border-radius: 11px;
+  background: var(--band-a);
+}
+.relOption {
+  flex: 1 1 0;
+  min-width: 0;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 7px;
-  height: 34px;
-  padding: 0 9px 0 8px;
-  border: 1px solid var(--line-control);
-  border-radius: 9px;
-  background: var(--surface);
+  height: 32px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
   font-size: 12.5px;
   color: var(--ink-2);
   cursor: pointer;
-  user-select: none;
   white-space: nowrap;
-  transition: background 0.12s ease, border-color 0.12s ease;
+  transition: background 0.12s ease, box-shadow 0.12s ease;
 }
-.relToggle:hover { background: var(--band-a); }
-.relToggle input { margin: 0; width: 15px; height: 15px; accent-color: var(--ink); cursor: pointer; }
-.relToggleOn { border-color: var(--ink-2); background: var(--surface); color: var(--ink); font-weight: 600; }
-.relToggle:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.relOption:hover { color: var(--ink); }
+.relOptionOn {
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.12), 0 0 0 1px var(--line-control);
+}
+.relOption:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.relLabel { overflow: hidden; text-overflow: ellipsis; }
+.relQuestion { margin: 0; font-size: 13px; font-weight: 600; color: var(--ink); }
 /* a swatch in the colour/ring the map uses for that relation */
 .relSwatch { width: 14px; height: 8px; border-radius: 4px; flex-shrink: 0; }
-.relToggle[data-kind="needs"] .relSwatch { background: var(--edge-prereq); }
-.relToggle[data-kind="unlocks"] .relSwatch { background: var(--st-ok); }
-.relToggle[data-kind="depends"] .relSwatch { background: color-mix(in srgb, var(--ink) 28%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 40%, transparent); }
+.relOption[data-kind="needs"] .relSwatch { background: var(--edge-prereq); }
+.relOption[data-kind="unlocks"] .relSwatch { background: var(--st-ok); }
+.relOption[data-kind="depends"] .relSwatch { background: color-mix(in srgb, var(--ink) 28%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 40%, transparent); }
 .relCount {
   font-family: "IBM Plex Mono", monospace;
   font-size: 11px;
@@ -631,8 +648,12 @@
 @media (max-width: 900px) {
   .selDock { left: 12px; right: 12px; bottom: 76px; }
 }
+@media (max-width: 560px) {
+  .relCount { display: none; }
+  .relOption { font-size: 12px; padding: 0 4px; gap: 5px; }
+}
 @media (prefers-reduced-motion: reduce) {
-  .relToggle { transition: none; }
+  .relOption { transition: none; }
 }
 
 .legendPanel {
@@ -1300,6 +1321,8 @@
   margin-bottom: 8px;
 }
 
+.requirementSource { margin: 8px 0 0; font-size: 11.5px; line-height: 1.4; color: var(--muted); }
+
 .secondaryLine {
   font-size: 13px;
   margin-top: 10px;
@@ -1731,6 +1754,121 @@
   align-items: center;
   justify-content: space-between;
   margin-top: 14px;
+}
+
+/* ---------- guided tour as a checklist ---------- */
+.tourBlocker { position: fixed; inset: 0; z-index: 89; cursor: default; }
+.tourDim { position: fixed; inset: 0; background: rgba(17, 22, 32, 0.4); z-index: 90; pointer-events: none; }
+/* "this is here", not "press me": dashed outline, no glow, no pulse */
+.tourSpot {
+  position: fixed;
+  z-index: 90;
+  pointer-events: none;
+  border-radius: 14px;
+  outline: 2px dashed #fff;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4000px rgba(17, 22, 32, 0.5);
+  transition: left 0.18s, top 0.18s, width 0.18s, height 0.18s;
+}
+.tourMarker {
+  position: fixed;
+  z-index: 91;
+  pointer-events: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 26px;
+  padding: 0 10px 0 4px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(16, 24, 40, 0.25);
+}
+.tourMarkerNum {
+  display: inline-grid;
+  place-items: center;
+  width: 19px;
+  height: 19px;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+}
+.tourCard {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 92;
+  width: min(380px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 16px 40px rgba(16, 24, 40, 0.24);
+  padding: 16px 18px 14px;
+}
+.tourCardRight { left: auto; right: 16px; }
+.tourHead { display: flex; align-items: center; justify-content: space-between; }
+.tourIntro { margin: 6px 0 10px; font-size: 13px; line-height: 1.45; color: var(--ink-2); }
+.tourList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-top: 1px solid var(--line-soft);
+  padding-top: 8px;
+}
+.tourItem { border-radius: 9px; }
+.tourItemCurrent { background: var(--accent-tint); }
+.tourItemHead {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 9px;
+}
+.tourItemHead:hover { background: var(--band-b); }
+.tourItemCurrent .tourItemHead { cursor: default; background: none; }
+.tourCheck {
+  flex-shrink: 0;
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  border: 1.5px solid var(--line-control);
+  color: var(--muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+.tourItemCurrent .tourCheck { border-color: var(--ink); background: var(--ink); color: #fff; }
+.tourItemDone .tourCheck { border-color: var(--st-ok); background: var(--st-ok); color: #fff; }
+.tourItemTitle { font-size: 13px; color: var(--muted); }
+.tourItemCurrent .tourItemTitle { color: var(--ink); font-weight: 700; }
+.tourItemDone .tourItemTitle { color: var(--ink-2); }
+.tourItemBody { margin: 0; padding: 0 10px 10px 37px; font-size: 13px; line-height: 1.5; color: var(--ink-2); }
+@media (max-width: 700px) {
+  .tourCard { left: 8px; right: 8px; bottom: 8px; width: auto; max-height: 62vh; }
+  .tourCardRight { left: 8px; right: 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tourSpot { transition: none; }
 }
 
 /* ---------- elective picker restyle ---------- */
@@ -2672,4 +2810,117 @@
 @media (prefers-reduced-motion: reduce) {
   .awBackdrop, .awDialog { animation: none; }
   .awOption { transition: none; }
+}
+
+/* ---------- first-visit welcome (leads into the Mi avance guide) ---------- */
+.introDialog {
+  position: relative;
+  width: min(560px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 30px 30px 26px;
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 18px;
+  box-shadow: 0 24px 64px rgba(16, 24, 40, 0.35);
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  animation: bkRise 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.introList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.introList li { display: flex; align-items: flex-start; gap: 12px; }
+.introList li .tourCheck { margin-top: 1px; border-color: var(--ink); color: var(--ink); }
+.introList li > span:last-child { display: flex; flex-direction: column; gap: 1px; font-size: 14px; }
+.introList em { font-style: normal; font-size: 12.5px; line-height: 1.45; color: var(--muted); }
+.introNote { margin: 4px 0 0; font-size: 12.5px; color: var(--muted); }
+.introCta { flex: none; align-self: stretch; height: 44px; margin-top: 8px; font-size: 14px; }
+@media (prefers-reduced-motion: reduce) {
+  .introDialog { animation: none; }
+}
+
+/* ---------- returning student: "¿necesitas un repaso?" ---------- */
+.refresher {
+  position: fixed;
+  top: 72px;
+  left: 50%;
+  z-index: 70;
+  transform: translateX(-50%);
+  width: min(520px, calc(100vw - 24px));
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 12px 14px 14px;
+  overflow: hidden;
+  background: linear-gradient(135deg, var(--surface) 0%, var(--accent-tint) 100%);
+  border: 1px solid var(--accent-border);
+  border-radius: 14px;
+  box-shadow: 0 14px 34px rgba(16, 24, 40, 0.18);
+  animation: refresherIn 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.refresherIcon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+}
+.refresherText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13.5px; color: var(--ink); }
+.refresherText span { font-size: 12.5px; color: var(--ink-2); }
+.refresherCta {
+  flex-shrink: 0;
+  height: 34px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #fff;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.refresherCta:hover { background: var(--ink-2); }
+.refresherClose {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.refresherClose:hover { background: var(--band-a); color: var(--ink); }
+/* the countdown: drains left → right, pauses on hover */
+.refresherBar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  width: 100%;
+  background: var(--accent);
+  transform-origin: left center;
+  animation-name: refresherDrain;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+@keyframes refresherIn {
+  from { opacity: 0; transform: translate(-50%, -14px) scale(0.97); }
+  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+@keyframes refresherDrain { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+@media (max-width: 560px) {
+  .refresher { flex-wrap: wrap; }
+  .refresherText { flex-basis: calc(100% - 90px); }
+  .refresherCta { margin-left: 48px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .refresher { animation: none; }
 }

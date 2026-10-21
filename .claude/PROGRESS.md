@@ -629,3 +629,38 @@ Detailed per-session entries live in `.claude/PROGRESS.md` on `mysql-migration`;
   first admin and receives the 12-word master secret. **On a public deployment, do that immediately after the first deploy.**
 - Application code is DB-portable (no raw SQL; transactions that re-check after a lock use READ COMMITTED) — rules in `docs/branches-and-releases.md`.
 
+
+## Session 2026-10-21 — onboarding/tour rework + information priority
+
+**Experience**
+- **First visit → centred welcome** (`components/explorer/IntroModal.tsx`) replaces the onboarding
+  side panel (`OnboardingPanel` now only exports `HintPill`). No backdrop/Esc dismissal; its one
+  button starts the Mi avance guide, and when the guide ends the "¿En qué punto vas?" welcome
+  (`AvanceWelcome`) opens. Key `pensum:intro-seen`; students who already finished a tour are not newcomers.
+- **Returning students → timed toast** (`RefresherToast.tsx`): "¡Hola de nuevo! ¿Necesitas un repaso?",
+  once per browser session (`sessionStorage pensum:refresher-shown`), 9 s countdown bar, pauses on hover/focus.
+- **Tour = checklist** (`Tour.tsx`, copy in `tours.ts`): every step listed up front with ✓ as they're
+  seen, card always in a fixed corner (bottom-left, flips right only if it would cover the target), the
+  target gets a dashed outline + a numbered marker matching the row (no "press me" glow), and a blocker
+  layer makes the page inert while the guide runs. Copy never commands an action ("aquí puedes…").
+  New `reltoggle` step in both tours; the example course is the one with most dependents.
+- **Relation selector** (`UnlockViewControl.tsx`): single-choice segmented toggle (radiogroup, arrow keys)
+  instead of checkboxes; the active option's question is shown under it
+  (¿qué debo aprobar antes? / ¿qué se me abre con solo aprobarlo? / ¿qué cursos lo piden, aunque pidan otros?).
+- **Catalog order** everywhere (`lib/catalogOrder.ts`): Electrónica, Eléctrica, Doble programa, Maestrías.
+
+**Business logic**
+- Era toggle ("Pensum 2024-I+ | Hasta 2023-II") removed; the picker only reads the `*From2024` role columns.
+- **EFI slot** → `EngineeringElectivePicker.tsx`: any `I***` code (`lib/engineeringCode.ts`), looked up via
+  new `GET /api/courses/lookup` (live API → `Course` row → Registro upload).
+- **Electives**: the Excel bag is the list; new `GET /api/electives/enrich` adds code/credits/sections from
+  the live offering where it matches (`lib/electiveMatch.ts`, shared with `/api/electives/resolve`,
+  10-min per-prefix cache). Unmatched or API down → Excel data, labelled as such.
+- **Requirement priority** (`lib/requirementResolve.ts`, see `docs/admin-discrepancies.md`): API (term) →
+  document → Registro upload → API of another term; empty sources are skipped. Fixes `IELE3206`
+  (taught only in `…10` terms, so no 202620 offering, and old rows had an empty document). The seed also
+  fills empty document text on kept rows (`req_filled=N`). The side panel says where the requirements came from.
+- Verified locally (Postgres 16, seeded, API unreachable from the sandbox): unit tests 161 pass / 11 skipped
+  (pre-existing scratch-DB skips), payload-equivalence test passes, `npm run build` passes, browser pass of
+  intro → checklist tour → welcome, refresher toast, toggle, EFI lookup and elective fallback, 390 px width.
+  **Not verified:** the live-API enrichment path (the sandbox can't reach ofertadecursos.uniandes.edu.co).

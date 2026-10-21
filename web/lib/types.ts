@@ -24,8 +24,10 @@ export interface Restriction {
   desc: string[]; // ["PREGRADO"]
 }
 
-/** Where a course's requirement data came from. */
-export type RequirementSource = "api" | "document" | null;
+/** Where a course's requirement data came from, in priority order (see
+ * lib/requirementResolve.ts): the live API for the plan's term, the plan's
+ * document data, the Registro upload, the API data of another term. */
+export type RequirementSource = "api" | "document" | "registro" | "api-history" | null;
 
 export interface Course {
   id: string;
@@ -54,10 +56,13 @@ export interface Course {
   coreqCourseIds: string[];
   /** coreq codes not in this catalog (labs/practices like "IELE 1118L") */
   coreqExternal: string[];
-  /** "api" when prereq/coreq came from the live courseDetails endpoint,
-   * "document" when from the PRERREQUISITOS spreadsheet, null when neither */
+  /** which source won for prereq/coreq (lib/requirementResolve.ts), null when
+   * no source has data */
   prereqSource?: RequirementSource;
   coreqSource?: RequirementSource;
+  /** the term/period of that source's data, when it has one ("202610") */
+  prereqSourceTerm?: string | null;
+  coreqSourceTerm?: string | null;
   /** title per coreq code, when known from the API ("IELE2002L" → "LAB. …") */
   coreqTitles?: Record<string, string>;
   /** enrollment restrictions (informational, from the API) */
