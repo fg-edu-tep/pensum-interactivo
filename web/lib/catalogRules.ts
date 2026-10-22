@@ -26,6 +26,17 @@ const LANGUAGE_ATTESTATION = {
     "inglés” en el mapa.",
 };
 
+// Not the same as the English-reading requirement above: a separate
+// graduation requirement of proficiency in a second language.
+export const SECOND_LANGUAGE_ATTESTATION = {
+  id: "segundo-idioma",
+  label: "Requisito segundo idioma",
+  description:
+    "Dominio de una segunda lengua exigido para grado (distinto del requisito de lectura en inglés).",
+  infoUrl:
+    "https://cienciassociales.uniandes.edu.co/lenguas-cultura/servicios/requisitos-lenguas-grado/requisito-de-dominio-en-segunda-lengua/",
+};
+
 // Two distinct graduation requirements — NOT the same thing.
 const INTERNACIONALIZACION_ATTESTATION = {
   id: "internacionalizacion",
@@ -57,6 +68,7 @@ function cbu3Rules(): CatalogRules {
   return {
     attestations: [
       LANGUAGE_ATTESTATION,
+      SECOND_LANGUAGE_ATTESTATION,
       INTERNACIONALIZACION_ATTESTATION,
       SABERPRO_ATTESTATION,
     ],

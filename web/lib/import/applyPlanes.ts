@@ -12,6 +12,8 @@ import { parseRequirement } from "./requirementParser";
 import { writeAudit } from "../audit";
 import { buildPlanesDiff } from "./diffPlanes";
 import type { ParsedPlanCourse, ParsedPlanesWorkbook } from "./parsePlanesWorkbook";
+import type { CatalogRules, GateRule } from "../types";
+import { isCreditUnlock } from "../creditUnlocks";
 
 export interface ApplyOptions {
   /** delete CatalogCourse rows the sheet no longer contains (default: keep) */
@@ -309,8 +311,19 @@ export async function applyPlanesJob(
             }
           })
           .filter(Boolean);
-        const rules = { attestations, gates } as unknown as Prisma.InputJsonValue;
         for (const catId of catIds) {
+          // the credit thresholds are edited in the admin, not in PLANES.xlsx: keep them
+          const prev = (await tx.catalog.findUnique({ where: { id: catId }, select: { rules: true } }))?.rules as
+            | CatalogRules
+            | null;
+          const fromSheet = new Set(gates.map((g) => (g as GateRule).id));
+          const keptUnlocks = (prev?.gates ?? []).filter((g) => isCreditUnlock(g) && !fromSheet.has(g.id));
+          const rules = {
+            attestations,
+            gates: [...gates, ...keptUnlocks],
+            ...(prev?.creditUnlocksSeeded ? { creditUnlocksSeeded: true } : {}),
+            ...(prev?.secondLanguageSeeded ? { secondLanguageSeeded: true } : {}),
+          } as unknown as Prisma.InputJsonValue;
           await tx.catalog.update({ where: { id: catId }, data: { rules } });
         }
         for (const g of diff.gradRules) {

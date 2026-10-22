@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Course } from "@/lib/types";
 import {
+  companionKind,
   DAY_LONG,
   DAY_SHORT,
   fmtMinutes,
@@ -36,6 +37,8 @@ const HELP_ARTICLE_URL =
   "https://registro.uniandes.edu.co/index.php/component/content/article/14-aspirantesgeneral/183-como-hacer-mi-horario";
 const GENERAL_RULES_URL =
   "https://registro.uniandes.edu.co/index.php/elaboracion-de-horario/instrucciones-generales-del-proceso-de-registro-de-cursos";
+const CBU_OFERTA_URL = "https://educaciongeneral.uniandes.edu.co/cbu/";
+const CBU_RULES_URL = "https://educaciongeneral.uniandes.edu.co/transicion-de-cbu/";
 const ERRORS_URL = "https://registro.uniandes.edu.co/index.php/elaboracion-de-horario/mensajes-de-error";
 
 interface Props {
@@ -110,9 +113,15 @@ export default function BasketModal({
   onRemove,
   onShare,
 }: Props) {
-  const items = useMemo(() => courses.filter((c) => planned.has(c.id)), [courses, planned]);
-  const credits = items.reduce((s, c) => s + c.credits, 0);
-  const codesKey = items.map((c) => c.codeNormalized).sort().join(",");
+  const planned_ = useMemo(() => courses.filter((c) => planned.has(c.id)), [courses, planned]);
+  // slots (a CBU) have no sections of their own: listed apart, outside the
+  // section picker, the week and the NRC list
+  const baseItems = useMemo(() => planned_.filter((c) => !c.isPlaceholder), [planned_]);
+  const slotItems = useMemo(() => planned_.filter((c) => c.isPlaceholder), [planned_]);
+  const credits = planned_.reduce((s, c) => s + c.credits, 0);
+  // the declared corequisites go in the request; labs / complementarias the
+  // offering pairs with each course come back as `companions`
+  const codesKey = [...new Set(baseItems.flatMap((c) => [c.codeNormalized, ...c.coreqExternal]))].sort().join(",");
 
   const [stage, setStage] = useState<Stage>("review");
   const [data, setData] = useState<SectionsResponse | null>(null);
@@ -144,6 +153,39 @@ export default function BasketModal({
       });
     return () => ctrl.abort();
   }, [codesKey, planTermCode]);
+
+  // --- obligatory companions (labs, complementarias): each one is its own
+  //     entry with its own section/NRC, right after its course ---
+  const { items, companionOf } = useMemo(() => {
+    const companionOf = new Map<string, Course>(); // companion entry id → its course
+    const out: Course[] = [];
+    for (const c of baseItems) {
+      out.push(c);
+      const comps = new Set<string>([...c.coreqExternal, ...(data?.companions?.[c.codeNormalized] ?? [])]);
+      for (const code of comps) {
+        if (planned_.some((p) => p.codeNormalized === code)) continue; // planned on its own
+        const kind = companionKind(code);
+        const title = c.coreqTitles?.[code];
+        const comp: Course = {
+          ...c,
+          id: `${c.id}~${code}`,
+          code: code.replace(/^([A-Z]+)(\d)/, "$1 $2"),
+          codeNormalized: code,
+          name: title || `${kind} de ${c.name}`,
+          credits: 0,
+          prereqCourseIds: [],
+          coreqExternal: [],
+          coreqText: "",
+          description: null,
+        };
+        companionOf.set(comp.id, c);
+        out.push(comp);
+      }
+    }
+    return { items: out, companionOf };
+  }, [baseItems, planned_, data]);
+  const companionsFor = (id: string) => items.filter((x) => companionOf.get(x.id)?.id === id);
+  const withCompanions = baseItems.filter((c) => companionsFor(c.id).length > 0);
 
   // --- remembered picks + suggestions, once data is in ---
   useEffect(() => {
@@ -232,7 +274,7 @@ export default function BasketModal({
     return ref ? ref.term : null;
   }, [data]);
   const missingSections = picked.filter((p) => loadState === "ready" && !p.section).length;
-  const allSet = loadState === "ready" && items.length > 0 && missingSections === 0 && clashes.length === 0;
+  const allSet = loadState === "ready" && planned_.length > 0 && missingSections === 0 && clashes.length === 0;
   const planLabel = termLabel(planTermCode);
 
   /** how many other sections of this course would fit around everything else */
@@ -261,11 +303,14 @@ export default function BasketModal({
     }, 30);
   };
 
-  const nrcLines = picked.map(({ course, section }) =>
-    section
-      ? `${course.code} · Sec ${section.section} · NRC ${section.nrc}${section.instructors.length ? ` · ${section.instructors.map(titleCaseName).join(", ")}` : ""}`
-      : `${course.code} · (sin sección elegida)`
-  );
+  const nrcLines = [
+    ...picked.map(({ course, section }) =>
+      section
+        ? `${course.code} · Sec ${section.section} · NRC ${section.nrc}${section.instructors.length ? ` · ${section.instructors.map(titleCaseName).join(", ")}` : ""}`
+        : `${course.code} · (sin sección elegida)`
+    ),
+    ...slotItems.map((c) => `${c.code} · ${toSentenceCase(c.name)} (curso por elegir)`),
+  ];
   const copyNrcs = async () => {
     const header = `Mi plan ${planLabel} — ${credits} créditos${referenceTerm ? ` (secciones de ${termLabel(referenceTerm)} como referencia)` : ""}`;
     try {
@@ -282,7 +327,7 @@ export default function BasketModal({
     scrollRef.current?.scrollTo({ top: 0 });
   };
 
-  const coreqCourses = items.filter((c) => c.coreqText);
+  const coreqCourses = baseItems.filter((c) => c.coreqText);
 
   return (
     <div className={styles.bkOverlay} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
@@ -309,7 +354,7 @@ export default function BasketModal({
             <p className={styles.bkSub}>
               {stage === "next"
                 ? "Tres pasos para dejar tu horario inscrito"
-                : `${items.length} curso${items.length === 1 ? "" : "s"} · ${credits} créditos`}
+                : `${planned_.length} curso${planned_.length === 1 ? "" : "s"} · ${credits} créditos`}
               {stage === "review" && loadState === "ready" && clashes.length > 0 && ` · ${clashes.length} cruce${clashes.length === 1 ? "" : "s"} de horario`}
               {stage === "review" && loadState === "ready" && clashes.length === 0 && missingSections > 0 && ` · ${missingSections} sin sección publicada`}
               {stage === "review" && allSet && (referenceTerm ? " · sin cruces en los horarios de referencia" : " · sin cruces")}
@@ -322,7 +367,7 @@ export default function BasketModal({
               </button>
             </li>
             <li>
-              <button type="button" className={`${styles.bkStepBtn} ${stage === "next" ? styles.bkStepOn : ""}`} aria-current={stage === "next" ? "step" : undefined} onClick={() => goStage("next")} disabled={items.length === 0}>
+              <button type="button" className={`${styles.bkStepBtn} ${stage === "next" ? styles.bkStepOn : ""}`} aria-current={stage === "next" ? "step" : undefined} onClick={() => goStage("next")} disabled={planned_.length === 0}>
                 <span className={styles.bkStepNum}>2</span> Qué sigue
               </button>
             </li>
@@ -348,7 +393,7 @@ export default function BasketModal({
                 </div>
               )}
 
-              {items.length === 0 ? (
+              {planned_.length === 0 ? (
                 <div className={styles.bkEmpty}>
                   <BasketIcon size={30} />
                   <strong>Tu canasta está vacía</strong>
@@ -356,19 +401,33 @@ export default function BasketModal({
                 </div>
               ) : (
                 <>
-                  <WeekPanel picked={picked} clashes={clashes} clashIds={clashIds} loading={loadState === "loading"} referenceTerm={referenceTerm} onBlock={jumpToCourse} />
-                  <NrcExplainer />
+                  {items.length > 0 && <WeekPanel picked={picked} clashes={clashes} clashIds={clashIds} loading={loadState === "loading"} referenceTerm={referenceTerm} onBlock={jumpToCourse} />}
+                  {items.length > 0 && <NrcExplainer />}
 
-                  <h3 className={styles.bkSectionTitle}>Tus cursos</h3>
+                  {items.length > 0 && <h3 className={styles.bkSectionTitle}>Tus cursos</h3>}
+                  {withCompanions.length > 0 && (
+                    <div className={styles.bkCoreqNotice} role="note">
+                      <strong>
+                        {withCompanions.length === 1 ? "Un curso" : `${withCompanions.length} cursos`} de tu canasta{" "}
+                        {withCompanions.length === 1 ? "tiene" : "tienen"} correquisitos obligatorios.
+                      </strong>{" "}
+                      {withCompanions
+                        .map((c) => `${c.code} → ${companionsFor(c.id).map((x) => `${x.code} (${companionKind(x.codeNormalized).toLowerCase()})`).join(", ")}`)
+                        .join("; ")}
+                      . Ya están en tu semana: se inscriben al mismo tiempo, cada uno con su propio NRC.
+                    </div>
+                  )}
                   <div className={styles.bkList}>
                     {picked.map((p) => {
                       const { course, cs, section } = p;
+                      const parent = companionOf.get(course.id);
+                      const comps = parent ? [] : companionsFor(course.id);
                       const open = expanded === course.id;
                       const clash = clashIds.has(course.id);
                       const group = groupOf(course);
                       const alts = loadState === "ready" ? altCount(p) : 0;
                       return (
-                        <article key={course.id} id={`bk-course-${course.id}`} className={`${styles.bkCourse} ${open ? styles.bkCourseOpen : ""} ${clash ? styles.bkCourseClash : ""}`}>
+                        <article key={course.id} id={`bk-course-${course.id}`} className={`${styles.bkCourse} ${parent ? styles.bkCompanion : ""} ${open ? styles.bkCourseOpen : ""} ${clash ? styles.bkCourseClash : ""}`}>
                           <div className={styles.bkCourseHead}>
                             <button type="button" className={styles.bkCourseToggle} aria-expanded={open} aria-controls={`bk-${course.id}`} onClick={() => setExpanded(open ? null : course.id)}>
                               <span className={styles.bkGlyph} style={{ background: groupColor(group) }}>
@@ -378,7 +437,14 @@ export default function BasketModal({
                                 <span className={styles.bkCourseTitle}>{toSentenceCase(course.name)}</span>
                                 <span className={styles.bkCourseMeta}>
                                   <span className={styles.bkCode}>{course.code}</span>
-                                  <span>{course.credits} cr</span>
+                                  {parent ? (
+                                    <span className={styles.bkObligatory}>Obligatorio con {parent.code}</span>
+                                  ) : (
+                                    <span>{course.credits} cr</span>
+                                  )}
+                                  {comps.length > 0 && (
+                                    <span className={styles.bkObligatory}>+ {comps.map((x) => x.code).join(", ")} obligatorio</span>
+                                  )}
                                   {section && (
                                     <>
                                       <span className={styles.bkPicked}>
@@ -400,9 +466,11 @@ export default function BasketModal({
                                 <ChevronDownIcon size={14} />
                               </span>
                             </button>
-                            <button type="button" className={styles.bkRemove} onClick={() => onRemove(course.id)} aria-label={`Quitar ${course.code} de la canasta`} title="Quitar de la canasta">
-                              <CloseIcon size={14} />
-                            </button>
+                            {!parent && (
+                              <button type="button" className={styles.bkRemove} onClick={() => onRemove(course.id)} aria-label={`Quitar ${course.code} de la canasta`} title="Quitar de la canasta">
+                                <CloseIcon size={14} />
+                              </button>
+                            )}
                           </div>
 
                           {open && (
@@ -429,6 +497,47 @@ export default function BasketModal({
                     })}
                   </div>
 
+                  {slotItems.length > 0 && (
+                    <>
+                      <h3 className={styles.bkSectionTitle}>Espacios por elegir</h3>
+                      <div className={styles.bkList}>
+                        {slotItems.map((course) => (
+                          <article key={course.id} id={`bk-course-${course.id}`} className={styles.bkCourse}>
+                            <div className={styles.bkCourseHead}>
+                              <div className={styles.bkCourseToggle} style={{ cursor: "default" }}>
+                                <span className={styles.bkGlyph} style={{ background: groupColor(groupOf(course)) }}>
+                                  <TypeGlyph group={groupOf(course)} />
+                                </span>
+                                <span className={styles.bkCourseMain}>
+                                  <span className={styles.bkCourseTitle}>{toSentenceCase(course.name)}</span>
+                                  <span className={styles.bkCourseMeta}>
+                                    <span className={styles.bkCode}>{course.code}</span>
+                                    <span>{course.credits} cr</span>
+                                    {course.placeholderKind === "CBU" ? (
+                                      <>
+                                        <a href={CBU_OFERTA_URL} target="_blank" rel="noopener noreferrer" className={styles.bkSlotLink}>
+                                          Elige tu CBU en la oferta <ExternalIcon size={11} />
+                                        </a>
+                                        <a href={CBU_RULES_URL} target="_blank" rel="noopener noreferrer" className={styles.bkSlotLink}>
+                                          1 de Colombia + 2 libres <ExternalIcon size={11} />
+                                        </a>
+                                      </>
+                                    ) : (
+                                      <span className={styles.bkMuted}>Elige el curso para este espacio</span>
+                                    )}
+                                  </span>
+                                </span>
+                              </div>
+                              <button type="button" className={styles.bkRemove} onClick={() => onRemove(course.id)} aria-label={`Quitar ${course.code} de la canasta`} title="Quitar de la canasta">
+                                <CloseIcon size={14} />
+                              </button>
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+                    </>
+                  )}
+
                   {unlockedNextTerm.length > 0 && (
                     <div className={styles.unlockInsight}>
                       <span>
@@ -445,6 +554,7 @@ export default function BasketModal({
               referenceTerm={referenceTerm}
               nrcLines={picked.map((p) => ({ course: p.course, section: p.section }))}
               coreqCourses={coreqCourses}
+              slotItems={slotItems}
               clashCount={clashes.length}
               mihorarioUrl={mihorarioUrl}
               copied={copied}
@@ -466,11 +576,11 @@ export default function BasketModal({
               <button type="button" className={styles.btnGhostFooter} onClick={onClose}>
                 Seguir editando
               </button>
-              <button type="button" className={styles.btnGhostFooter} onClick={copyNrcs} disabled={picked.every((p) => !p.section)}>
+              <button type="button" className={styles.btnGhostFooter} onClick={copyNrcs} disabled={picked.every((p) => !p.section) && slotItems.length === 0}>
                 {copied ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
                 {copied ? "NRC copiados" : "Copiar mis NRC"}
               </button>
-              <button type="button" className={styles.btnPrimary} onClick={() => goStage("next")} disabled={items.length === 0}>
+              <button type="button" className={styles.btnPrimary} onClick={() => goStage("next")} disabled={planned_.length === 0}>
                 Continuar: qué sigue <ArrowRightIcon size={14} />
               </button>
             </>
@@ -500,12 +610,14 @@ function NextSteps({
   referenceTerm,
   nrcLines,
   coreqCourses,
+  slotItems,
   clashCount,
   mihorarioUrl,
   copied,
   onCopy,
   onShare,
 }: {
+  slotItems: Course[];
   planLabel: string;
   referenceTerm: string | null;
   nrcLines: { course: Course; section: SectionInfo | null }[];
@@ -530,6 +642,16 @@ function NextSteps({
             </>
           )}
           {clashCount > 0 && <>Tu selección tiene {clashCount} cruce{clashCount === 1 ? "" : "s"}; puedes resolverlos al ajustar el horario en el paso 2.</>}
+        </div>
+      )}
+
+      {slotItems.length > 0 && (
+        <div className={styles.bkNotice} role="note">
+          También llevas {slotItems.length === 1 ? "un espacio" : `${slotItems.length} espacios`} por elegir (
+          {slotItems.map((c) => c.code).join(", ")}). Escoge el curso en la{" "}
+          <a href={CBU_OFERTA_URL} target="_blank" rel="noopener noreferrer">oferta de CBU</a> y agrégalo con su NRC al
+          armar tu horario. Recuerda la combinación: 1 CBU de Colombia y 2 CBU libres (
+          <a href={CBU_RULES_URL} target="_blank" rel="noopener noreferrer">reglas de CBU</a>).
         </div>
       )}
 

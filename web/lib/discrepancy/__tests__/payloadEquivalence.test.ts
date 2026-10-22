@@ -1,7 +1,7 @@
 // LOCK between the admin discrepancy logic and the student payload.
 //
-// lib/discrepancy mirrors the precedence in lib/catalogPayload.ts on purpose
-// (the payload builder is intentionally untouched). This test runs BOTH against
+// lib/discrepancy and lib/catalogPayload.ts both resolve requirements through
+// lib/requirementResolve.ts, but load their inputs separately. This test runs BOTH against
 // the same database and fails if they ever disagree on which tree students see,
 // or on where it came from. READ-ONLY.
 //
@@ -60,8 +60,9 @@ test("every course: discrepancy governance == what buildCatalogPayload gives stu
         continue;
       }
       checked++;
-      const pre = d.effectiveTree("prereq", input.offering, input.docPrereqTree);
-      const co = d.effectiveTree("coreq", input.offering, input.docCoreqTree);
+      const extra = { registro: input.registro, history: input.history };
+      const pre = d.effectiveTree("prereq", input.offering, input.docPrereqTree, { ...extra, docText: input.docPrereqText });
+      const co = d.effectiveTree("coreq", input.offering, input.docCoreqTree, { ...extra, docText: input.docCoreqText });
       if (canon(pre.tree) !== canon(student.prereqTree)) mismatches.push(`${slug}/${input.code}: prereq tree differs`);
       if (canon(co.tree) !== canon(student.coreqTree)) mismatches.push(`${slug}/${input.code}: coreq tree differs`);
       if (pre.governor !== (student.prereqSource === "api" ? "api" : "document") && !(student.prereqSource === null && pre.governor === "document"))
@@ -72,6 +73,10 @@ test("every course: discrepancy governance == what buildCatalogPayload gives stu
       const rep = d.reportCourse(input);
       if ((rep.prereq.visibleText ?? "") !== (student.prereqText ?? ""))
         mismatches.push(`${slug}/${input.code}: prereq text "${rep.prereq.visibleText}" vs "${student.prereqText}"`);
+      if ((rep.coreq.visibleText ?? "") !== (student.coreqText ?? ""))
+        mismatches.push(`${slug}/${input.code}: coreq text "${rep.coreq.visibleText}" vs "${student.coreqText}"`);
+      if (rep.prereq.source !== (student.prereqSource ?? null))
+        mismatches.push(`${slug}/${input.code}: prereq source ${rep.prereq.source} vs ${student.prereqSource}`);
     }
   }
   assert.ok(checked > 100, `expected to compare >100 courses, compared ${checked}`);

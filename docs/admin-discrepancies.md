@@ -24,36 +24,28 @@ exact values on both sides and who most likely caused the difference.
 
 ## The precedence (what students see)
 
-Implemented in `lib/catalogPayload.ts` (student payload builder — **intentionally
-untouched**). `off` = the course's `CourseOffering` for **`catalog.term`** (e.g. `202620`);
-`detailsFetched = off.detailsSyncedAt && !off.detailsError`.
+Written down **once**, in `lib/requirementResolve.ts`, and called by both the student payload
+(`lib/catalogPayload.ts`) and this report — the report no longer mirrors the payload by hand.
+`off` = the course's `CourseOffering` for **`catalog.term`**; `detailsFetched = off.detailsSyncedAt && !off.detailsError`.
+The first source that **has data** wins; an empty source is skipped, never read as "no requirement".
 
-| Field | Students get | Governor |
-|---|---|---|
-| **Prerequisites** | `off.apiPrereqTree` if present | API |
-| | else, if `detailsFetched` and the API has no prereq text → **none** (the document is *ignored* even if it has text) | API |
-| | else the document tree (`CatalogCourse.prereqTree`) | document |
-| **Corequisites** | `off.apiCoreqTree` if present | API |
-| | else, if `detailsFetched` → **none** | API |
-| | else the document tree | document |
+| # | Source | Used when | `source` |
+|---|---|---|---|
+| 1 | Live API for the catalog's term (`off.apiPrereqTree` / `apiCoreqTree`) | it has a tree — or `detailsFetched` and the API lists none (prereqs: only when the API text is empty; unparseable text falls through) | `api` |
+| 2 | Document (`CatalogCourse.prereqText/Tree`, `coreqText/Tree`: seed, PLANES, Registro wizard, admin edits) | it has a tree | `document` |
+| 3 | Registro upload (`RegistroCourse` of the latest *applied* import; before any is applied, the latest one not discarded) | it has text | `registro` |
+| 4 | API data synced for another term (newest first) | it has a tree | `api-history` |
+| – | nothing | — | `null` |
 
-"Document governs" therefore means: no offering row for the term, course not offered,
-offering sync failed, details never fetched, details fetch failed, or the API returned
-prerequisite text that could not be parsed into a tree.
+The **text** students see (side panel, basket chips) is always the winning source's — the two old
+"known inconsistencies" (prereq text from the document when the API said "none"; coreq text always
+from the document) are gone. `governor` in this report stays two-valued: `api` for row 1, `document`
+for everything else (`source`/`sourceTerm` say which fallback).
 
-### Known inconsistencies in the student payload (documented, not changed)
-
-Found while building this; the discrepancy logic mirrors them so it tells the truth.
-
-1. **Prerequisite text vs tree.** `prereqText = apiPrereqTree ? apiText : document text`.
-   When the API confirms "no prerequisite" the *tree* is empty but the *text* is the document's.
-   The explorer draws from the tree, so this is harmless today, but the text is wrong.
-2. **Corequisite text is always the document's** (`coreqText: cc.coreqText`), regardless of
-   who governs the tree. `components/explorer/BasketModal.tsx` prints `coreqText` as a chip
-   ("Correquisito …") and in the pre-enrolment tips, so **a document corequisite that disagrees
-   with the API can still reach students in the enrolment basket.** The coreq alerts say so.
-
-Whether to fix these is a separate decision (it would mean touching the student payload).
+Why rows 3–4 exist: a course taught only in first semesters (e.g. `IELE3206` Instrumentación) has no
+offering in a `…20` term, and rows built before the seed learned to fall back to the latest earlier
+Registro period kept an empty document. The seed now also fills such **empty** document text on kept
+rows (`req_filled=N` in its log), never touching hand-edited rows or pinned fields.
 
 ## What is reported
 
@@ -119,7 +111,8 @@ latent differences that would surface if the API data for the course ever disapp
 | Piece | Path |
 |---|---|
 | Tree canonicalisation / comparison | `web/lib/discrepancy/compare.ts` |
-| Governance mirror, statuses, causes, wording | `web/lib/discrepancy/report.ts` |
+| The priority itself (shared with the student payload) | `web/lib/requirementResolve.ts`, DB glue in `web/lib/requirementSources.ts` |
+| Statuses, causes, wording | `web/lib/discrepancy/report.ts` |
 | DB loading (one loader for every surface) | `web/lib/discrepancy/service.ts` (`loadCourseInputs`, `buildDiscrepancyReports`) |
 | Wizard glue (student impact, API mentions) | `web/lib/discrepancy/wizard.ts` |
 | Shared alert | `web/components/admin/DiscrepancyAlert.tsx` |
@@ -132,9 +125,10 @@ Read-only: nothing here writes to the database.
 
 ## Design decisions
 
-- **Mirror, don't refactor.** The student payload builder is untouched (the student view was
-  verified and the request was "do not touch what works"). The governance logic is duplicated
-  on purpose and **locked by a test** (below).
+- **One resolver, not a mirror** (2026-10-21). The governance used to be duplicated here on
+  purpose; it now lives in `lib/requirementResolve.ts` and both sides call it. The
+  equivalence test (below) still runs both against the same database, since they load their
+  inputs separately; it now also compares coreq text and the exact `source`.
 - **Compare against `catalog.term` only** — the same term the payload uses. If a plan's term lags
   behind the current offering term, every comparison is against that older term; the page shows
   the term and the API sync date.
@@ -177,5 +171,5 @@ Read-only: nothing here writes to the database.
 - Registro-vs-API is not compared directly; the comparison is always document-vs-API (the
   document is what the Registro wizard writes).
 - Placeholders and requirement nodes are out of scope.
-- The two student-payload inconsistencies above are reported, not fixed.
+- ~~The two student-payload inconsistencies~~ — fixed 2026-10-21: the text always follows the winning source.
 - Wording is Spanish only, consistent with the rest of the admin.

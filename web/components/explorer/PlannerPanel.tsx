@@ -41,9 +41,10 @@ export default function PlannerPanel({
   const pct = creditsTotal > 0 ? Math.round((creditsDone / creditsTotal) * 100) : 0;
   const nextTerm = nextTermShort();
 
-  const suggestions = courses
-    .filter((c) => !c.isPlaceholder && !approved.has(c.id) && !planned.has(c.id) && statusById.get(c.id) === "available")
-    .slice(0, 4);
+  const open = (c: Course) => !approved.has(c.id) && !planned.has(c.id) && statusById.get(c.id) === "available";
+  // up to 4 real courses, plus one CBU slot (a CBU can go in the basket too)
+  const cbu = courses.find((c) => c.isPlaceholder && c.placeholderKind === "CBU" && open(c));
+  const suggestions = [...courses.filter((c) => !c.isPlaceholder && open(c)).slice(0, 4), ...(cbu ? [cbu] : [])];
 
   return (
     <aside className={styles.panel} data-tour="planner">

@@ -917,3 +917,8 @@
   color: var(--a-muted);
   font-size: 11.5px;
 }
+/* Reglas → Desbloqueo por créditos */
+.admin-root .unlock-table { margin: 8px 0 10px; }
+.admin-root .unlock-table td { vertical-align: middle; }
+.admin-root .unlock-kinds { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.admin-root .unlock-kind { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; white-space: nowrap; }

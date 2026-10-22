@@ -1,19 +1,36 @@
 "use client";
 
+// The guided tour, as a CHECKLIST rather than a coach mark glued to a button.
+//
+// Why: a spotlight on a button plus a card right next to it reads as "click
+// this now", and students did — which broke the sequence. So:
+//   - the checklist card always sits in the same corner (bottom-left, or
+//     bottom-right when the target is there), so there is one place to read;
+//   - the target gets a dashed "this is here" outline and a numbered marker
+//     matching the checklist row, never a "press me" glow;
+//   - the page is locked while the guide runs (it's a look-around, nothing
+//     needs doing yet), so following along can't knock the flow over;
+//   - every row is visible up front ("we'll show you this, this and this"),
+//     done ones get a ✓, and any row can be revisited.
+
 import { useEffect, useRef, useState } from "react";
+import { CheckIcon } from "./icons";
 import styles from "./explorer.module.css";
 
 export interface TourStepDef {
   id: string;
-  /** CSS selector of the element to spotlight. Omit (or if it isn't on screen)
-   * and the step renders as a centred card — a step never disappears. */
+  /** CSS selector of the element to point at. Omit (or if it isn't on screen)
+   * and the step only shows in the checklist — a step never disappears. */
   target?: string;
   title: string;
   body: string;
+  /** short name shown on the marker next to the target ("Selección rápida") */
+  marker?: string;
 }
 
-const COACH_W = 340;
-const COACH_H = 210; // generous estimate, only used for placement
+const CARD_W = 380;
+const CARD_H_EST = 460; // only used to avoid covering the target
+const GAP = 16;
 
 function sameRect(a: DOMRect | null, b: DOMRect | null) {
   if (!a || !b) return a === b;
@@ -54,18 +71,27 @@ function useTargetRect(selector: string | undefined) {
   return rect;
 }
 
+function intersects(a: { l: number; t: number; r: number; b: number }, rect: DOMRect) {
+  return a.l < rect.right && a.r > rect.left && a.t < rect.bottom && a.b > rect.top;
+}
+
 interface Props {
   steps: TourStepDef[];
   step: number;
   label: string; // e.g. "Recorrido del mapa"
+  /** one line under the title that frames the whole guide */
+  intro: string;
   onNext: () => void;
   onBack: () => void;
+  onJump: (step: number) => void;
   onSkip: () => void;
 }
 
-export default function Tour({ steps, step, label, onNext, onBack, onSkip }: Props) {
+export default function Tour({ steps, step, label, intro, onNext, onBack, onJump, onSkip }: Props) {
   const def = steps[step];
   const rect = useTargetRect(def?.target);
+  const nextRef = useRef<HTMLButtonElement>(null);
+  const currentRowRef = useRef<HTMLLIElement>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -77,73 +103,97 @@ export default function Tour({ steps, step, label, onNext, onBack, onSkip }: Pro
     return () => document.removeEventListener("keydown", onKey);
   }, [onSkip, onNext, onBack]);
 
+  useEffect(() => {
+    nextRef.current?.focus({ preventScroll: true });
+    currentRowRef.current?.scrollIntoView?.({ block: "nearest" });
+  }, [step]);
+
   if (!def) return null;
 
   const last = step === steps.length - 1;
   const vw = typeof window === "undefined" ? 1200 : window.innerWidth;
   const vh = typeof window === "undefined" ? 800 : window.innerHeight;
+  const narrow = vw < 700;
 
-  let coachPos: React.CSSProperties;
-  let spot: React.ReactNode;
-  if (rect) {
-    const pad = 6;
-    spot = (
-      <div
-        style={{
-          position: "fixed",
-          left: rect.left - pad,
-          top: rect.top - pad,
-          width: rect.width + pad * 2,
-          height: rect.height + pad * 2,
-          borderRadius: 14,
-          boxShadow: "0 0 0 2px #fff, 0 0 0 4000px rgba(17,22,32,.55)",
-          zIndex: 90,
-          pointerEvents: "none",
-          transition: "left .18s, top .18s, width .18s, height .18s",
-        }}
-      />
-    );
-    const tall = rect.height > vh * 0.5;
-    if (tall) {
-      // a big target (the side panel): put the card beside it
-      const roomLeft = rect.left - 16 - COACH_W >= 8;
-      const left = roomLeft ? rect.left - 16 - COACH_W : Math.min(rect.right + 16, vw - COACH_W - 8);
-      coachPos = { left, top: Math.max(16, Math.min(rect.top + 24, vh - COACH_H - 16)) };
-    } else {
-      const below = rect.bottom + 16 + COACH_H < vh;
-      coachPos = {
-        left: Math.min(Math.max(16, rect.left), vw - COACH_W - 16),
-        top: below ? rect.bottom + 16 : Math.max(16, rect.top - 16 - COACH_H),
-      };
-    }
-  } else {
-    // target not on screen (yet, or this view doesn't have it) — never vanish
-    spot = <div style={{ position: "fixed", inset: 0, background: "rgba(17,22,32,.45)", zIndex: 90, pointerEvents: "none" }} />;
-    coachPos = { left: Math.max(16, (vw - COACH_W) / 2), top: Math.max(16, vh / 2 - COACH_H / 2) };
+  // one of two fixed corners — whichever doesn't cover the target
+  let side: "left" | "right" = "left";
+  if (rect && !narrow) {
+    const w = Math.min(CARD_W, vw - 2 * GAP);
+    const h = Math.min(CARD_H_EST, vh - 2 * GAP);
+    const leftBox = { l: GAP, t: vh - GAP - h, r: GAP + w, b: vh - GAP };
+    const rightBox = { l: vw - GAP - w, t: vh - GAP - h, r: vw - GAP, b: vh - GAP };
+    if (intersects(leftBox, rect) && !intersects(rightBox, rect)) side = "right";
   }
+
+  const pad = 6;
+  const markerNumber = step + 1;
 
   return (
     <>
-      {spot}
+      {/* the page is not interactive during the guide; clicks land here */}
+      <div className={styles.tourBlocker} aria-hidden onMouseDown={(e) => e.preventDefault()} />
+      {rect ? (
+        <>
+          <div
+            className={styles.tourSpot}
+            style={{ left: rect.left - pad, top: rect.top - pad, width: rect.width + pad * 2, height: rect.height + pad * 2 }}
+          />
+          <div
+            className={styles.tourMarker}
+            style={{
+              left: Math.min(Math.max(8, rect.left - pad), vw - 220),
+              top: rect.top - pad - 34 < 8 ? rect.bottom + pad + 6 : rect.top - pad - 34,
+            }}
+            aria-hidden
+          >
+            <span className={styles.tourMarkerNum}>{markerNumber}</span>
+            {def.marker ?? def.title}
+          </div>
+        </>
+      ) : (
+        <div className={styles.tourDim} aria-hidden />
+      )}
+
       <div
         role="dialog"
+        aria-modal="true"
         aria-label={`${label}, paso ${step + 1} de ${steps.length}`}
-        className={styles.coachMark}
-        style={{ position: "fixed", ...coachPos, zIndex: 91 }}
+        className={`${styles.tourCard} ${side === "right" ? styles.tourCardRight : ""}`}
       >
-        <div className={styles.coachDots}>
-          {steps.map((s, i) => (
-            <span key={s.id} className={`${styles.coachDot} ${i === step ? styles.coachDotActive : ""}`} />
-          ))}
+        <div className={styles.tourHead}>
+          <span className={styles.kicker}>{label}</span>
           <span className={styles.coachCount}>
             {step + 1} de {steps.length}
           </span>
         </div>
-        <div className={styles.coachTitle}>{def.title}</div>
-        <div className={styles.coachBody}>{def.body}</div>
+        <p className={styles.tourIntro}>{intro}</p>
+
+        <ol className={styles.tourList}>
+          {steps.map((s, i) => {
+            const state = i < step ? "done" : i === step ? "current" : "todo";
+            return (
+              <li
+                key={s.id}
+                ref={i === step ? currentRowRef : undefined}
+                className={`${styles.tourItem} ${state === "done" ? styles.tourItemDone : ""} ${state === "current" ? styles.tourItemCurrent : ""}`}
+                aria-current={state === "current" ? "step" : undefined}
+              >
+                <button type="button" className={styles.tourItemHead} onClick={() => onJump(i)} tabIndex={state === "current" ? -1 : 0}>
+                  <span className={styles.tourCheck} aria-hidden>
+                    {state === "done" ? <CheckIcon size={11} /> : i + 1}
+                  </span>
+                  <span className={styles.tourItemTitle}>{s.title}</span>
+                  {state === "done" && <span className={styles.srOnly}>(visto)</span>}
+                </button>
+                {state === "current" && <p className={styles.tourItemBody}>{s.body}</p>}
+              </li>
+            );
+          })}
+        </ol>
+
         <div className={styles.coachFooter}>
           <button type="button" className={styles.descToggle} onClick={onSkip}>
-            Saltar guía
+            Salir de la guía
           </button>
           <div style={{ display: "flex", gap: 8 }}>
             {step > 0 && (
@@ -151,8 +201,8 @@ export default function Tour({ steps, step, label, onNext, onBack, onSkip }: Pro
                 Atrás
               </button>
             )}
-            <button type="button" className={styles.btnPrimary} style={{ flex: "none", height: 32, padding: "0 14px" }} onClick={onNext}>
-              {last ? "Listo" : "Siguiente"}
+            <button ref={nextRef} type="button" className={styles.btnPrimary} style={{ flex: "none", height: 32, padding: "0 14px" }} onClick={onNext}>
+              {last ? "Terminar la guía" : "Siguiente"}
             </button>
           </div>
         </div>

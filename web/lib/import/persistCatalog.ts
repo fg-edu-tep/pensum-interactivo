@@ -2,6 +2,8 @@
 // Used by scripts/seed.ts and by lib/import/apply.ts (the latter wraps this in a
 // snapshot + import-job transaction).
 
+import type { CatalogRules } from "../types";
+import { withRuleDefaults } from "../creditUnlocks";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../db";
 import type { ParsedCatalog, ParsedCourse } from "./parsePensumWorkbook";
@@ -68,6 +70,8 @@ export interface PersistResult {
   apiFailureRate: number;
   /** whether CatalogCourse rows were rebuilt from Excel this run */
   rebuilt: boolean;
+  /** kept rows whose empty prereq/coreq text was filled from the export */
+  requirementGapsFilled: number;
 }
 
 function toInputJson(v: unknown): Prisma.InputJsonValue | typeof Prisma.JsonNull {
@@ -126,6 +130,15 @@ export async function persistParsedCatalog(
         : {}),
     },
   });
+
+  // 1a. kept plans get the default credit thresholds once (lib/creditUnlocks.ts)
+  {
+    const current = (catalog.rules as CatalogRules | null) ?? { gates: [], attestations: [] };
+    const next = withRuleDefaults(current, catalog);
+    if (next !== current) {
+      await prisma.catalog.update({ where: { id: catalog.id }, data: { rules: next as unknown as Prisma.InputJsonValue } });
+    }
+  }
 
   // 1b. requirement nodes — create-only (never overwrite an admin's edits)
   for (const rn of opts.requirementNodes ?? []) {
@@ -216,6 +229,42 @@ export async function persistParsedCatalog(
     });
   }
 
+  // Kept rows: fill EMPTY requirement text from the Registro export (which
+  // already falls back to a course's latest earlier period, e.g. a course
+  // only taught in first semesters). Never overwrites a value, a pinned field
+  // or a hand-edited row.
+  let requirementGapsFilled = 0;
+  if (!rebuildCourses) {
+    const kept = await prisma.catalogCourse.findMany({
+      where: { catalogId: catalog.id, isPlaceholder: false, courseId: { not: null }, manuallyEdited: false },
+      select: { id: true, courseId: true, prereqText: true, coreqText: true, lockedFields: true },
+    });
+    const codeById = new Map([...courseIdByCode].map(([code, id]) => [id, code] as const));
+    const missing = kept.filter((r) => r.courseId != null && !codeById.has(r.courseId)).map((r) => r.courseId!);
+    if (missing.length) {
+      for (const x of await prisma.course.findMany({ where: { id: { in: missing } }, select: { id: true, normalizedCode: true } }))
+        codeById.set(x.id, x.normalizedCode);
+    }
+    for (const r of kept) {
+      const pr = prereqMap.get(codeById.get(r.courseId!) ?? "");
+      if (!pr) continue;
+      const locked = new Set(((r.lockedFields as string[] | null) ?? []).map(String));
+      const data: Prisma.CatalogCourseUpdateInput = {};
+      if (!r.prereqText?.trim() && pr.prereqText && !locked.has("prereqText")) {
+        data.prereqText = pr.prereqText;
+        data.prereqTree = toInputJson(parseRequirement(pr.prereqText));
+      }
+      if (!r.coreqText?.trim() && pr.coreqText && !locked.has("coreqText")) {
+        data.coreqText = pr.coreqText;
+        data.coreqTree = toInputJson(parseRequirement(pr.coreqText.replace(/-/g, " ")));
+      }
+      if (Object.keys(data).length) {
+        await prisma.catalogCourse.update({ where: { id: r.id }, data });
+        requirementGapsFilled += 1;
+      }
+    }
+  }
+
   const catalogCourses = await prisma.catalogCourse.findMany({
     where: { catalogId: catalog.id },
     orderBy: { sortIndex: "asc" },
@@ -292,6 +341,7 @@ export async function persistParsedCatalog(
     detailsPaired,
     apiFailureRate,
     rebuilt: rebuildCourses,
+    requirementGapsFilled,
   };
 }
 

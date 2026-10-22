@@ -1,3 +1,4 @@
+import { normalizeCode } from "@/lib/import/normalizeCode";
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
@@ -33,7 +34,11 @@ export async function PATCH(
     data.name = name;
     data.normalizedName = normalizedName;
   }
-  if ("code" in body) data.code = String(body.code ?? "").trim() || null;
+  if ("code" in body) {
+    data.code = normalizeCode(body.code) || null;
+    // an admin-set code is kept by later seeds (they only fill blanks)
+    data.codeSource = data.code ? "admin" : null;
+  }
   if ("level" in body) data.level = String(body.level ?? "pregrado").trim() || "pregrado";
   if ("ciclo" in body) data.ciclo = String(body.ciclo ?? "").trim() || null;
   if ("isCursoIntegrador" in body) data.isCursoIntegrador = Boolean(body.isCursoIntegrador);
