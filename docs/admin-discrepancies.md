@@ -166,8 +166,12 @@ Read-only: nothing here writes to the database.
 
 ## Known limits / not done
 
-- There is no in-app **re-sync** of API data; the page only shows how old it is. (The P2.4
-  manual-pairing queue / re-sync from the original plan is not built.)
+- **Re-sync** (2026-10-22): changing a course's code in the course editor (or adding a real
+  course) pulls that course's offering + requirements from the API on save. The course editor
+  also has a per-row **Sincronizar API** button and a **Sincronizar todo el plan con la API**
+  button (`POST /api/admin/catalogs/[slug]/resync`, body `{ courseId?, term? }`, via
+  `lib/pairing/syncCatalogCourses.ts`). This page itself has no re-sync button and only shows
+  how old the data is. The P2.4 manual-pairing queue is still not built.
 - Registro-vs-API is not compared directly; the comparison is always document-vs-API (the
   document is what the Registro wizard writes).
 - Placeholders and requirement nodes are out of scope.

@@ -16,6 +16,8 @@ export default function CourseTable({ slug, courses }: Props) {
   const [draft, setDraft] = useState({ displayCode: "", name: "", credits: "", courseType: "nucleo" });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   const groups = useMemo(() => {
     const bySem = new Map<number, EditorCourse[]>();
@@ -29,6 +31,37 @@ export default function CourseTable({ slug, courses }: Props) {
 
   const maxSem = groups.length ? groups[groups.length - 1][0] : 0;
   const totalCredits = courses.reduce((s, c) => s + (c.credits || 0), 0);
+
+  async function resyncAll() {
+    setSyncing(true);
+    setSyncMsg(null);
+    try {
+      const res = await fetch(`/api/admin/catalogs/${slug}/resync`, { method: "POST" });
+      const d = (await res.json()) as {
+        error?: string;
+        courses?: number;
+        offered?: number;
+        notOffered?: number;
+        failed?: number;
+        aborted?: boolean;
+      };
+      if (!res.ok) {
+        setSyncMsg({ ok: false, text: d.error ?? "No se pudo sincronizar." });
+        return;
+      }
+      setSyncMsg({
+        ok: !d.failed,
+        text: d.aborted
+          ? `La API no responde: se interrumpió la sincronización (${d.failed} con error).`
+          : `${d.courses} cursos consultados: ${d.offered} ofertados, ${d.notOffered} no ofertados este semestre${d.failed ? `, ${d.failed} con error` : ""}.`,
+      });
+      router.refresh();
+    } catch {
+      setSyncMsg({ ok: false, text: "Error de red." });
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   async function addCourse(sem: number) {
     setBusy(true);
@@ -66,6 +99,12 @@ export default function CourseTable({ slug, courses }: Props) {
           ({courses.length} filas · {totalCredits} créditos)
         </span>
       </h2>
+      <div className="er-actions" style={{ marginBottom: 12 }}>
+        <button className="admin-btn" disabled={syncing} onClick={resyncAll}>
+          {syncing ? "Consultando la API… (puede tardar un minuto)" : "Sincronizar todo el plan con la API"}
+        </button>
+        {syncMsg && <span className={syncMsg.ok ? "admin-saved" : "admin-error"}>{syncMsg.text}</span>}
+      </div>
 
       {groups.map(([sem, rows]) => (
         <div key={sem} className="course-sem-group">

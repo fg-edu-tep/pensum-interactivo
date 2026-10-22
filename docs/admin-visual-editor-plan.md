@@ -215,7 +215,7 @@ Suggested order of value: B0→B1 (foundation), B2 (useful alone), B3, B4, B5, B
 - Fixing the two known student-payload inconsistencies (basket `coreqText`, prereq text with an empty
   tree) — reported in [`admin-discrepancies.md`](admin-discrepancies.md), separate decision.
 - Editing placeholders' pools, electives or graduation rules on the canvas (existing editors remain).
-- A new re-sync of API data (the P2.4 queue is still not built).
+- A new re-sync of API data on the canvas (the course editor has one since 2026-10-22; the P2.4 queue is still not built).
 - Mobile/touch editing.
 
 ---

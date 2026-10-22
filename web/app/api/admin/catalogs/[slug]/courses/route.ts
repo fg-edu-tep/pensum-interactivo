@@ -5,8 +5,11 @@ import { writeAudit } from "@/lib/audit";
 import { normalizeCode } from "@/lib/import/normalizeCode";
 import { classifyCourse } from "@/lib/import/classifyPlaceholder";
 import { parseRequirement } from "@/lib/import/requirementParser";
+import { syncCatalogCourses, type SyncedCourse } from "@/lib/pairing/syncCatalogCourses";
 
 export const runtime = "nodejs";
+// a real course pulls its offering + requirements from the API (a few seconds)
+export const maxDuration = 60;
 
 /** POST — add a CatalogCourse row to this plan. */
 export async function POST(
@@ -83,5 +86,17 @@ export async function POST(
     entityId: created.id,
     after: { slug, displayCode, name, semester },
   });
-  return NextResponse.json({ ok: true, id: created.id });
+
+  // pull the offering now (best effort — the row is already created)
+  let sync: SyncedCourse | null = null;
+  let syncError: string | null = null;
+  if (courseId != null) {
+    try {
+      sync = (await syncCatalogCourses(catalog.id, { ids: [created.id] })).courses[0] ?? null;
+    } catch (err) {
+      syncError = err instanceof Error ? err.message : String(err);
+      console.error("course sync after create failed", err);
+    }
+  }
+  return NextResponse.json({ ok: true, id: created.id, sync, syncError });
 }
