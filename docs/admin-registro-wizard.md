@@ -167,5 +167,5 @@ All destructive runs used a scratch database (`pensum_regtest`, copied inside th
 
 - No registro search endpoint: the whole ≈ 83-entry dictionary ships to the browser and is filtered client-side (fine at this size).
 - Only one open run is encouraged; concurrent runs are allowed but each apply re-plans against the live DB.
-- The wizard does not re-sync offerings after a rebind.
+- The wizard does not re-sync offerings after a rebind — use **Sincronizar todo el plan con la API** in the course editor afterwards.
 - No favicon (pre-existing 404).

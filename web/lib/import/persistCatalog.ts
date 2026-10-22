@@ -345,7 +345,9 @@ export async function persistParsedCatalog(
   };
 }
 
-async function applyPairResult(
+/** Persist one pairing result (status, CourseOffering, ManualPairing). Also used
+ * by the on-demand re-sync (lib/pairing/syncCatalogCourses.ts). */
+export async function applyPairResult(
   r: CoursePairResult,
   cc: { id: number; courseId: number | null; displayCode: string; name: string; credits: number; suggestedSemester: number; prereqText: string | null },
   term: string,

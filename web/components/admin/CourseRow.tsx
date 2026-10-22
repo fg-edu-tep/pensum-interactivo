@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import DiscrepancyAlert from "./DiscrepancyAlert";
+import type { SyncedCourse } from "@/lib/pairing/syncCatalogCourses";
 import {
   COURSE_TYPES,
   PAIRING_LABEL,
+  describeSync,
   PLACEHOLDER_KINDS,
   type EditorCourse,
 } from "./editorTypes";
@@ -74,6 +76,7 @@ export default function CourseRow({ slug, course, prevId, nextId }: Props) {
   async function save() {
     setBusy("save");
     setMsg(null);
+    let synced = "";
     try {
       if (scalarDirty || locksDirty) {
         const body: Record<string, unknown> = { lockedFields: locked };
@@ -97,11 +100,14 @@ export default function CourseRow({ slug, course, prevId, nextId }: Props) {
             body: JSON.stringify(body),
           }
         );
-        const d = (await res.json()) as { error?: string };
+        const d = (await res.json()) as { error?: string; sync?: SyncedCourse | null; syncError?: string | null };
         if (!res.ok) {
           setMsg({ ok: false, text: d.error ?? "No se pudo guardar." });
           return;
         }
+        // a code change re-pulls the API right away (server side)
+        if (d.sync) synced = ` · ${describeSync(d.sync)}`;
+        else if (d.syncError) synced = ` · no se pudo consultar la API (${d.syncError})`;
       }
       if (descDirty && course.normalizedCode) {
         const res = await fetch(
@@ -118,7 +124,7 @@ export default function CourseRow({ slug, course, prevId, nextId }: Props) {
           return;
         }
       }
-      setMsg({ ok: true, text: "Guardado." });
+      setMsg({ ok: true, text: `Guardado.${synced}` });
       router.refresh();
     } catch {
       setMsg({ ok: false, text: "Error de red." });
@@ -151,6 +157,30 @@ export default function CourseRow({ slug, course, prevId, nextId }: Props) {
         body: JSON.stringify({ aId: course.id, bId: otherId }),
       });
       if (res.ok) router.refresh();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function resync() {
+    setBusy("sync");
+    setMsg(null);
+    try {
+      const res = await fetch(`/api/admin/catalogs/${slug}/resync`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ courseId: course.id }),
+      });
+      const d = (await res.json()) as { error?: string; results?: SyncedCourse[] };
+      const s = d.results?.[0];
+      if (!res.ok || !s) {
+        setMsg({ ok: false, text: d.error ?? "No se pudo sincronizar." });
+        return;
+      }
+      setMsg({ ok: s.pairingStatus !== "sync_failed", text: describeSync(s) });
+      router.refresh();
+    } catch {
+      setMsg({ ok: false, text: "Error de red." });
     } finally {
       setBusy(null);
     }
@@ -344,6 +374,16 @@ export default function CourseRow({ slug, course, prevId, nextId }: Props) {
         >
           {busy === "save" ? "Guardando…" : "Guardar"}
         </button>
+        {!course.isPlaceholder && course.normalizedCode && (
+          <button
+            className="admin-btn"
+            disabled={busy != null}
+            onClick={resync}
+            title={`Volver a traer la oferta y los requisitos de ${course.normalizedCode} desde la API`}
+          >
+            {busy === "sync" ? "Consultando API…" : "Sincronizar API"}
+          </button>
+        )}
         {dirty && (
           <button
             className="admin-btn"

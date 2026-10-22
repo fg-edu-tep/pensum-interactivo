@@ -545,7 +545,11 @@ reorder, `manuallyEdited` + per-field `lockedFields`); `RequirementNode` CRUD;
 `Elective` table. Each mutation → `writeAudit` + set `manuallyEdited`. The stub at
 `(panel)/catalogos/[slug]/page.tsx` is where this lands.
 
-**P2.4 — manual-pairing queue + re-sync.** Queue of `pairingStatus ∈
+**P2.4 — manual-pairing queue + re-sync.** *Re-sync done 2026-10-22:*
+`POST /api/admin/catalogs/[slug]/resync` (`{courseId?, term?}`) →
+`lib/pairing/syncCatalogCourses.ts` (pairs each row with its *bound* code,
+reuses `applyPairResult`); the course PATCH/POST routes call it on a rebind /
+new real course; buttons in the course editor. Still to do: the queue. Queue of `pairingStatus ∈
 {needs_manual,not_offered,placeholder_pool,sync_failed}`; `GET
 /api/admin/course-search` proxy; bind-to-code / keep-as-placeholder;
 `POST /api/admin/catalogs/[slug]/resync` → `pairCatalog` with `fetchDetails`
