@@ -171,14 +171,19 @@ export interface GateCondition {
 export interface GateRule {
   id: string;
   label: string; // shown on the locked course + in the side panel
-  /** which courses this rule locks */
-  appliesTo: { codeRegex?: string; semesters?: number[]; ids?: string[] };
+  /** which courses this rule locks. `placeholderKinds` selects pensum SLOTS
+   * (EFI, ELECTIVA, CLE, CI, CBU…); slots are only ever matched by it or by
+   * `ids`, never by code regex / semester, so older gates keep their scope. */
+  appliesTo: { codeRegex?: string; semesters?: number[]; ids?: string[]; placeholderKinds?: string[] };
   condition: GateCondition;
 }
 
 export interface CatalogRules {
   gates: GateRule[];
   attestations: Attestation[];
+  /** set once the default credit thresholds (lib/creditUnlocks.ts) were added,
+   * so an admin who removes one doesn't get it back */
+  creditUnlocksSeeded?: boolean;
 }
 
 /** A real elective a student has dropped into an elective slot (Mi avance mode). */

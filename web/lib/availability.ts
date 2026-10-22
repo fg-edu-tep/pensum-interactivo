@@ -144,9 +144,11 @@ function safeRegex(src: string): RegExp | null {
 
 function courseMatches(
   course: Course,
-  sel: { codeRegex?: string; semesters?: number[]; ids?: string[] }
+  sel: { codeRegex?: string; semesters?: number[]; ids?: string[]; placeholderKinds?: string[] }
 ): boolean {
   if (sel.ids?.includes(course.id)) return true;
+  // slots (EFI, electivas, CBU…) are selected by kind only
+  if (course.isPlaceholder) return !!course.placeholderKind && !!sel.placeholderKinds?.includes(course.placeholderKind);
   if (sel.semesters?.includes(course.semester)) return true;
   if (sel.codeRegex) {
     const re = safeRegex(sel.codeRegex);
@@ -163,7 +165,7 @@ export function evaluateGates(
   ctx: RuleContext
 ): string[] {
   const rules = ctx.rules;
-  if (!rules || course.isPlaceholder) return [];
+  if (!rules) return [];
   const met = ctx.attestationsMet ?? new Set<string>();
   const reasons: string[] = [];
 
@@ -197,14 +199,19 @@ export function evaluateGates(
       );
       if (targets.some((x) => !approved.has(x.id))) unmet = true;
     }
+    let progress = "";
     if (!unmet && typeof c.minCredits === "number") {
-      if ((ctx.approvedCredits ?? 0) < c.minCredits) unmet = true;
+      const have = ctx.approvedCredits ?? 0;
+      if (have < c.minCredits) {
+        unmet = true;
+        progress = ` (llevas ${have} de ${c.minCredits})`;
+      }
     }
     if (!unmet && c.attestationId) {
       if (!met.has(c.attestationId)) unmet = true;
     }
 
-    if (unmet) reasons.push(gate.label);
+    if (unmet) reasons.push(gate.label + progress);
   }
 
   return reasons;

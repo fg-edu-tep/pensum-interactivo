@@ -6,6 +6,7 @@
 import { prisma } from "./db";
 import { termLabel } from "./term";
 import { sortCatalogs } from "./catalogOrder";
+import { withCreditUnlockDefaults } from "./creditUnlocks";
 import type {
   CatalogPayload,
   CatalogRules,
@@ -282,10 +283,10 @@ export async function buildCatalogPayload(slug: string): Promise<CatalogPayload 
     offerings,
     siblings,
     electives,
-    rules: ((catalog.rules as CatalogRules | null) ?? {
-      gates: [],
-      attestations: [],
-    }) as CatalogRules,
+    rules: withCreditUnlockDefaults(
+      ((catalog.rules as CatalogRules | null) ?? { gates: [], attestations: [] }) as CatalogRules,
+      catalog
+    ),
     requirementNodes,
   };
 }

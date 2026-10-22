@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { withCreditUnlockDefaults } from "@/lib/creditUnlocks";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { buildDiscrepancyReports } from "@/lib/discrepancy/service";
@@ -45,10 +46,11 @@ export default async function CatalogEditorPage({
     })
   );
 
-  const rules = (catalog.rules as CatalogRules | null) ?? {
-    gates: [],
-    attestations: [],
-  };
+  // the default credit thresholds show up here until the plan is saved once
+  const rules = withCreditUnlockDefaults(
+    (catalog.rules as CatalogRules | null) ?? { gates: [], attestations: [] },
+    catalog
+  );
 
   const data = {
     slug: catalog.slug,

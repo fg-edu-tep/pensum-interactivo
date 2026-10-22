@@ -66,9 +66,22 @@ export async function PATCH(
         { status: 400 }
       );
     }
+    const min = g.condition?.minCredits;
+    if (min != null && (!Number.isFinite(min) || min < 0)) {
+      return NextResponse.json(
+        { error: `Créditos inválidos en "${g.label}".` },
+        { status: 400 }
+      );
+    }
+  }
+  const ids = gates.map((g) => g.id);
+  if (new Set(ids).size !== ids.length) {
+    return NextResponse.json({ error: "Hay reglas con el mismo id." }, { status: 400 });
   }
 
-  const rules = { gates, attestations } as unknown as Prisma.InputJsonValue;
+  // saving marks the plan as past the default credit thresholds: what the
+  // admin left (deletions included) is what students get
+  const rules = { gates, attestations, creditUnlocksSeeded: true } as unknown as Prisma.InputJsonValue;
   await prisma.catalog.update({ where: { slug }, data: { rules } });
   await writeAudit({
     action: "catalog.rules.update",

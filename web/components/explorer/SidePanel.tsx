@@ -386,31 +386,51 @@ export default function SidePanel({
       </div>
 
       <div className={styles.panelFooter}>
-        {mode === "explore" || course.isPlaceholder ? (
+        {mode === "explore" ? (
           <button className={styles.btnPrimary} onClick={() => onToggleApproved(course.id)}>
             <CheckIcon />
-            {approved.has(course.id)
-              ? mode === "explore" ? "Desmarcar aprobada" : "Desmarcar"
-              : mode === "explore" ? "Marcar aprobada" : "Marcar como vista"}
+            {approved.has(course.id) ? "Desmarcar aprobada" : "Marcar aprobada"}
           </button>
         ) : approved.has(course.id) ? (
           <button className={styles.btnPrimary} onClick={() => onToggleApproved(course.id)}>
             Desmarcar
           </button>
         ) : (
-          <button
-            className={styles.btnPrimary}
-            disabled={gateReasons.length > 0 || (!isPlanned && !plannable)}
-            title={!isPlanned && !plannable ? "Aún no cumples los prerrequisitos (vistos + planeados)" : undefined}
-            onClick={() => onTogglePlanned(course.id, isPlanned ? null : nextTermCode())}
-          >
-            {!isPlanned && plannable && <BasketIcon size={15} />}
-            {isPlanned
-              ? "Quitar de la canasta"
-              : plannable
-                ? `Agregar a mi canasta · ${nextTermShort()}`
-                : "Requiere cursos previos"}
-          </button>
+          <>
+            {/* Mi avance: real courses and CBU slots can go in the basket;
+                every course and slot can be marked as seen, locked or not
+                (homologaciones, cursos vistos fuera del orden sugerido). */}
+            {(!course.isPlaceholder || isCbuSlot) && (
+              <button
+                className={`${styles.btnPrimary} ${styles.btnFullRow}`}
+                disabled={!isPlanned && (gateReasons.length > 0 || !plannable)}
+                title={
+                  !isPlanned && gateReasons.length > 0
+                    ? gateReasons.join(" · ")
+                    : !isPlanned && !plannable
+                      ? "Aún no cumples los prerrequisitos (vistos + planeados)"
+                      : undefined
+                }
+                onClick={() => onTogglePlanned(course.id, isPlanned ? null : nextTermCode())}
+              >
+                {!isPlanned && plannable && gateReasons.length === 0 && <BasketIcon size={15} />}
+                {isPlanned
+                  ? "Quitar de la canasta"
+                  : gateReasons.length > 0
+                    ? "Aún bloqueado"
+                    : plannable
+                      ? `Agregar a mi canasta · ${nextTermShort()}`
+                      : "Requiere cursos previos"}
+              </button>
+            )}
+            <button
+              className={!course.isPlaceholder || isCbuSlot ? styles.btnGhostFooter : styles.btnPrimary}
+              onClick={() => onToggleApproved(course.id)}
+            >
+              <CheckIcon />
+              Marcar como vista
+            </button>
+          </>
         )}
         {!course.isPlaceholder && link && (
           <a href={link} target="_blank" rel="noopener noreferrer" className={styles.btnGhostFooter}>

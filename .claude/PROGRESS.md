@@ -664,3 +664,25 @@ Detailed per-session entries live in `.claude/PROGRESS.md` on `mysql-migration`;
   (pre-existing scratch-DB skips), payload-equivalence test passes, `npm run build` passes, browser pass of
   intro → checklist tour → welcome, refresher toast, toggle, EFI lookup and elective fallback, 390 px width.
   **Not verified:** the live-API enrichment path (the sandbox can't reach ofertadecursos.uniandes.edu.co).
+
+## Session 2026-10-22 — credit thresholds for slots + "marcar como vista" everywhere (stacked on PR #3)
+
+- **Desbloqueo por créditos** (`lib/creditUnlocks.ts`). Slots (EFI, electivas, CLE, curso integrador, CBU)
+  can be locked in Mi avance until the student has declared N approved credits. They're ordinary
+  `Catalog.rules.gates` with a new `appliesTo.placeholderKinds` selector + `condition.minCredits`;
+  `evaluateGates` now evaluates slots, but a slot is only matched by `placeholderKinds`/`ids` (never by
+  code regex or semester), so older gates keep their scope. Unmet credit gates read
+  "Se habilita con 75 créditos aprobados (llevas 12 de 75)".
+- **Defaults** for pregrado plans (not maestrías): EFI 75, Electivas 80, CLE + Curso integrador 40.
+  `withCreditUnlockDefaults` adds them wherever rules are read (student payload, admin editor, seed) until
+  `rules.creditUnlocksSeeded` is set — by the seed and by every admin save — so production gets them
+  without a re-seed and an admin's deletion sticks. PLANES.xlsx imports keep the thresholds.
+- **Admin**: Plan → Reglas → "Desbloqueo por créditos" table (slot checkboxes + credits, add/remove);
+  the save route validates the numbers and duplicate ids.
+- **Mi avance panel**: every course and slot has "Marcar como vista" (locked or not); real courses and
+  **CBU slots** can go in the basket. The basket modal lists slots under "Espacios por elegir" (link to the
+  CBU offering, no section picker), includes them in credits / copied list / next steps; the planner
+  suggests one open CBU. Defined the missing `.btnFullRow` footer class.
+- Verified: 167 unit tests pass (new `lib/creditUnlocks.test.ts`), build passes, browser: slots locked at 0 cr
+  with the progress reason, mark-as-seen on a real course, CBU → basket → modal, admin threshold edit
+  (EFI 75 → 3) reflected in the student map, then restored.

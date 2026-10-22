@@ -2924,3 +2924,11 @@
 @media (prefers-reduced-motion: reduce) {
   .refresher { animation: none; }
 }
+
+/* basket: a CBU slot links to the CBU offering instead of listing sections */
+.bkSlotLink { display: inline-flex; align-items: center; gap: 4px; color: var(--accent); font-weight: 600; text-decoration: none; }
+.bkSlotLink:hover { text-decoration: underline; }
+
+/* a footer button that takes its own row (e.g. "Agregar a mi canasta" above
+   "Marcar como vista" + "Ver secciones") */
+.panelFooter .btnFullRow { flex: 1 0 100%; }
