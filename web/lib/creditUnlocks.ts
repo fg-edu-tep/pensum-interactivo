@@ -1,7 +1,11 @@
-// "Desbloqueo por créditos": slots of the pensum that only become available in
-// Mi avance once the student has declared enough approved credits. They are
-// ordinary gates (Catalog.rules.gates, evaluated by lib/availability.ts) that
-// select slots by `appliesTo.placeholderKinds` and require `condition.minCredits`.
+// "Desbloqueo por créditos": slots of the pensum that only read as available in
+// Mi avance once the student has declared enough approved credits. It's a UX
+// choice (a first-semester student shouldn't see every elective as "you can
+// take this now"), not a business rule: below the threshold the slot simply
+// shows the ordinary grey "not yet" state — no lock, no reason text — and it
+// can still be marked as seen. Stored as gates in Catalog.rules.gates that
+// select slots by `appliesTo.placeholderKinds` with `condition.minCredits`;
+// lib/availability.ts `creditPending` reads them (evaluateGates skips them).
 //
 // Defaults for the pregrado plans (the coordinators' numbers, editable in
 // /administrador → plan → Reglas):

@@ -686,3 +686,7 @@ Detailed per-session entries live in `.claude/PROGRESS.md` on `mysql-migration`;
 - Verified: 167 unit tests pass (new `lib/creditUnlocks.test.ts`), build passes, browser: slots locked at 0 cr
   with the progress reason, mark-as-seen on a real course, CBU → basket → modal, admin threshold edit
   (EFI 75 → 3) reflected in the student map, then restored.
+- **Follow-up (same day): thresholds are a UX state, not a lock.** Per the coordinators, the point is to not
+  overwhelm first-semester students, not to enforce a rule. `evaluateGates` now skips slot gates; the new
+  `creditPending()` makes a slot below its threshold read as the ordinary grey "not yet" state — no 🔒, no
+  "Regla administrativa" styling, no "Se habilita con…" text. Still markable as seen. Admin note reworded.

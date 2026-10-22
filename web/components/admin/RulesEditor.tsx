@@ -114,8 +114,10 @@ export default function RulesEditor({
 
       <h3 style={{ fontSize: 13, marginTop: 18 }}>Desbloqueo por créditos</h3>
       <p className="admin-note">
-        En <strong>Mi avance</strong>, estos espacios aparecen bloqueados hasta que el estudiante declare
-        como aprobados al menos estos créditos. Un espacio en varias filas necesita el mayor de los valores.
+        En <strong>Mi avance</strong>, estos espacios se ven en gris, como “aún no disponibles”, hasta que el
+        estudiante declare como aprobados al menos estos créditos. Es solo para no abrumar a quien empieza la
+        carrera: no muestra candado ni mensaje, y el espacio se puede marcar como visto en cualquier momento. Un
+        espacio en varias filas necesita el mayor de los valores.
       </p>
       <table className="admin-table unlock-table">
         <thead>

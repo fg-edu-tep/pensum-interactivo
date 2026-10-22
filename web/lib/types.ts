@@ -172,8 +172,9 @@ export interface GateRule {
   id: string;
   label: string; // shown on the locked course + in the side panel
   /** which courses this rule locks. `placeholderKinds` selects pensum SLOTS
-   * (EFI, ELECTIVA, CLE, CI, CBU…); slots are only ever matched by it or by
-   * `ids`, never by code regex / semester, so older gates keep their scope. */
+   * (EFI, ELECTIVA, CLE, CI, CBU…) for a credit threshold — a soft "not yet"
+   * state, not a lock (lib/creditUnlocks.ts). Slots are only ever matched by it
+   * or by `ids`, never by code regex / semester, so older gates keep their scope. */
   appliesTo: { codeRegex?: string; semesters?: number[]; ids?: string[]; placeholderKinds?: string[] };
   condition: GateCondition;
 }

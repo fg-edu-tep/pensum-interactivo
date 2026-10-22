@@ -157,6 +157,24 @@ function courseMatches(
   return false;
 }
 
+/**
+ * "Desbloqueo por créditos" (lib/creditUnlocks.ts): a slot whose threshold the
+ * student hasn't reached yet. This is a UX nicety for first-semester students,
+ * NOT a business rule — the slot just reads as "not yet" (the ordinary grey
+ * state), with no lock, no reason text, and it can still be marked as seen.
+ */
+export function creditPending(course: Course, ctx: RuleContext | undefined): boolean {
+  if (!course.isPlaceholder || !ctx?.rules) return false;
+  const have = ctx.approvedCredits ?? 0;
+  return (ctx.rules.gates ?? []).some(
+    (g) =>
+      !!g.appliesTo?.placeholderKinds?.length &&
+      courseMatches(course, g.appliesTo) &&
+      typeof g.condition?.minCredits === "number" &&
+      have < g.condition.minCredits
+  );
+}
+
 /** Unmet admin-rule labels for a course. Empty ⇒ not locked by rules. */
 export function evaluateGates(
   course: Course,
@@ -178,8 +196,9 @@ export function evaluateGates(
     if ([...codes].some((c) => re.test(c))) reasons.push(att.label);
   }
 
-  // explicit gate rules
+  // explicit gate rules (slot credit thresholds are not locks — see creditPending)
   for (const gate of rules.gates ?? []) {
+    if (gate.appliesTo?.placeholderKinds?.length) continue;
     if (!courseMatches(course, gate.appliesTo)) continue;
     const c = gate.condition;
     let unmet = false;
@@ -240,6 +259,10 @@ export function courseAvailability(
       : [];
   if (gateReasons.length > 0) {
     return { status: "blocked", missing: [], coreqBlockers: [], gateReasons };
+  }
+  // a slot below its credit threshold just reads as "not yet"
+  if (creditPending(course, ruleCtx)) {
+    return { status: "blocked", missing: [], coreqBlockers: [], gateReasons: [] };
   }
 
   // A soft ("*") prerequisite can be co-enrolled, but only if that course is

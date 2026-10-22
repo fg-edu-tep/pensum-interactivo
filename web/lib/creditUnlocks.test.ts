@@ -44,9 +44,12 @@ test("defaults: EFI 75, electivas 80, CLE + curso integrador 40", () => {
   assert.deepEqual(byKind, { EFI: 75, ELECTIVA: 80, CLE: 40, CI: 40 });
 });
 
-test("a first-semester student (0 cr) sees EFI, electivas, CLE and CI locked, CBU open", () => {
-  for (const c of [efi, ele, cle, ci]) assert.equal(status(c, 0).status, "blocked", c.id);
-  assert.match(status(efi, 0).gateReasons[0], /75 créditos.*llevas 0 de 75/);
+test("a first-semester student (0 cr) sees EFI, electivas, CLE and CI as 'not yet' — not locked, no reason text", () => {
+  for (const c of [efi, ele, cle, ci]) {
+    const a = status(c, 0);
+    assert.equal(a.status, "blocked", c.id);
+    assert.deepEqual(a.gateReasons, [], c.id); // no lock, no "Se habilita con…"
+  }
   assert.equal(status(cbu, 0).status, "available");
 });
 
