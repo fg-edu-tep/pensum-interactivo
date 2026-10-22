@@ -1,5 +1,6 @@
 import type { CatalogRules } from "@/lib/types";
 import type { FieldAlertData } from "./DiscrepancyAlert";
+import type { SyncedCourse } from "@/lib/pairing/syncCatalogCourses";
 
 export interface EditorIdentity {
   programName: string;
@@ -81,3 +82,13 @@ export const PAIRING_LABEL: Record<string, string> = {
   placeholder_pool: "pool",
   sync_failed: "falló sync",
 };
+
+/** One-line Spanish outcome of an API re-sync for a single course. */
+export function describeSync(s: SyncedCourse): string {
+  if (s.pairingStatus === "sync_failed") return `falló la consulta a la API (${s.error ?? "sin respuesta"})`;
+  if (!s.offered) return `la API no ofrece ${s.code} este semestre`;
+  const secs = `${s.sectionCount} ${s.sectionCount === 1 ? "sección" : "secciones"}`;
+  return s.details
+    ? `datos de la API actualizados (${s.code}, ${secs})`
+    : `la API ofrece ${s.code} (${secs}) pero falló la consulta de requisitos`;
+}

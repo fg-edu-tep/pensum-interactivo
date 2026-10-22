@@ -4,8 +4,11 @@ import { prisma } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
 import { normalizeCode } from "@/lib/import/normalizeCode";
 import { parseRequirement } from "@/lib/import/requirementParser";
+import { syncCatalogCourses, type SyncedCourse } from "@/lib/pairing/syncCatalogCourses";
 
 export const runtime = "nodejs";
+// a rebind pulls the course's offering + requirements from the API (a few seconds)
+export const maxDuration = 60;
 
 const SCALAR_FIELDS = [
   "displayCode",
@@ -83,14 +86,16 @@ export async function PATCH(
       : Prisma.JsonNull) as unknown as Prisma.InputJsonValue;
   }
 
-  // re-attach the global Course when the code changed to a real one
+  // re-attach the global Course when the code changed to a real one (or a
+  // placeholder slot was turned into a real course)
   const newCode =
     typeof data.displayCode === "string" ? data.displayCode : row.displayCode;
   const normalized = normalizeCode(newCode);
   const willBePlaceholder =
     data.isPlaceholder != null ? Boolean(data.isPlaceholder) : row.isPlaceholder;
+  const becameReal = row.isPlaceholder && !willBePlaceholder;
   if (
-    "displayCode" in body &&
+    ("displayCode" in body || becameReal) &&
     !willBePlaceholder &&
     normalized &&
     normalized !== row.course?.normalizedCode
@@ -121,7 +126,22 @@ export async function PATCH(
       Object.keys(before).map((k) => [k, (updated as Record<string, unknown>)[k]])
     ),
   });
-  return NextResponse.json({ ok: true });
+
+  // a new binding has no CourseOffering yet — pull it now so students (and the
+  // discrepancy report) get the API data without waiting for a re-seed. Best
+  // effort: the edit is already saved, a failed sync just reports back.
+  let sync: SyncedCourse | null = null;
+  let syncError: string | null = null;
+  if (!willBePlaceholder && ("courseId" in data || becameReal)) {
+    try {
+      const out = await syncCatalogCourses(row.catalogId, { ids: [id] });
+      sync = out.courses[0] ?? null;
+    } catch (err) {
+      syncError = err instanceof Error ? err.message : String(err);
+      console.error("course sync after edit failed", err);
+    }
+  }
+  return NextResponse.json({ ok: true, sync, syncError });
 }
 
 /** DELETE — remove one CatalogCourse row. */

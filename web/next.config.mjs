@@ -18,6 +18,15 @@ const nextConfig = {
     // lint is run separately in CI; don't fail the container build on it
     ignoreDuringBuilds: true,
   },
+  // /embed/* pages are meant to be iframed from other sites (department pages)
+  async headers() {
+    return [
+      {
+        source: "/embed/:path*",
+        headers: [{ key: "Content-Security-Policy", value: "frame-ancestors *" }],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
