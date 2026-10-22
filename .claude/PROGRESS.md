@@ -690,3 +690,32 @@ Detailed per-session entries live in `.claude/PROGRESS.md` on `mysql-migration`;
   overwhelm first-semester students, not to enforce a rule. `evaluateGates` now skips slot gates; the new
   `creditPending()` makes a slot below its threshold read as the ordinary grey "not yet" state — no 🔒, no
   "Regla administrativa" styling, no "Se habilita con…" text. Still markable as seen. Admin note reworded.
+
+## Session 2026-10-22 (b) — labs in the basket, second language, elective availability, CBU rules
+
+- **Basket labs/complementarias.** `/api/sections` keeps the companions its loose name search already
+  returned (`<code>` + one letter: L laboratorio, C complementaria, P práctica, T taller) and lists them in
+  `companions`; the declared `coreqExternal` codes are requested too (e.g. `IELE3402` → `IELE3403`). The
+  modal adds each companion as its own entry right after its course (own section/NRC, in the week, clash
+  check and NRC list, can't be removed on its own) and shows a notice "N cursos tienen correquisitos
+  obligatorios…" plus a "+ IELE 1218L obligatorio" tag on the course.
+- **Checklist de grado:** new `segundo-idioma` attestation ("Requisito segundo idioma", distinct from the
+  English-reading one) with a "Más información" link (`Attestation.infoUrl`, editable in Reglas). Added to
+  existing plans on read once (`withRuleDefaults`, flag `secondLanguageSeeded`), like the credit thresholds.
+- **Electives — data:** migration `20261022125700_elective_offering_history` (additive): `codeSource,
+  frequency, frequencySource, lastOfferedTerm, registroName, registroCredits, registroPrereqText`. The bag
+  Excel can carry `CÓDIGO` / `SE DICTA` columns; blanks are derived by the seed from the full Registro
+  history (`lib/import/electiveHistory.ts`, see `scripts/exportTemplates.md`). Admin-set codes are kept.
+  `/api/electives/enrich` now also returns this term's prerequisites for offered electives; a known code
+  missing from the offering is "not taught this term" (no more title guessing for it).
+- **Electives — UI:** in Mi avance each row is colour + "Puedes tomarla" or greyscale/striped + 🔒 "Aún no"
+  (prereqs: this term's API, else Registro at the last period taught). Clicking a row answers "¿Qué
+  necesito antes de tomar X?" with the rendered expression, the missing courses (clickable → map) and the
+  source. Non-offered electives show "Última vez dictado en: 2025-1" and the usual semester.
+- **CBU:** side panel and basket state the combination rule (1 CBU de Colombia + 2 CBU libres) with a link
+  to educaciongeneral.uniandes.edu.co/transicion-de-cbu/.
+- Verified: 174 unit tests pass (+ electiveHistory tests), payload-equivalence passes, build passes;
+  browser: Interfaces Hombre-Máquina available vs Automatización Industrial locked (needs IELE 2300) with
+  its "Te falta" panel, IELE 1218 + IELE 1218L in the basket with the notice, checklist shows 4 items,
+  CBU rules box. **Not verified:** live API sections/details (sandbox has no access); prod needs
+  `prisma migrate deploy` (vercel-build does it) **and a seed run** for the elective history columns.

@@ -3,7 +3,7 @@
 // snapshot + import-job transaction).
 
 import type { CatalogRules } from "../types";
-import { withCreditUnlockDefaults } from "../creditUnlocks";
+import { withRuleDefaults } from "../creditUnlocks";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../db";
 import type { ParsedCatalog, ParsedCourse } from "./parsePensumWorkbook";
@@ -134,7 +134,7 @@ export async function persistParsedCatalog(
   // 1a. kept plans get the default credit thresholds once (lib/creditUnlocks.ts)
   {
     const current = (catalog.rules as CatalogRules | null) ?? { gates: [], attestations: [] };
-    const next = withCreditUnlockDefaults(current, catalog);
+    const next = withRuleDefaults(current, catalog);
     if (next !== current) {
       await prisma.catalog.update({ where: { id: catalog.id }, data: { rules: next as unknown as Prisma.InputJsonValue } });
     }

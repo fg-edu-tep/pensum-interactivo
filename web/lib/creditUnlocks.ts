@@ -13,13 +13,14 @@
 //   Electivas IELE                                80 créditos
 //   Curso de libre elección + Curso integrador    40 créditos
 //
-// They're added with `withCreditUnlockDefaults` wherever rules are read (the
+// They're added with `withRuleDefaults` wherever rules are read (the
 // student payload, the admin editor, the seed) until the plan is marked
 // `creditUnlocksSeeded` — which the seed and every admin save do — so a
 // threshold an admin deletes stays deleted and production gets the defaults
 // without a re-seed.
 
 import type { CatalogRules, GateRule } from "./types";
+import { SECOND_LANGUAGE_ATTESTATION } from "./catalogRules";
 import { catalogFamilyRank, type OrderableCatalog } from "./catalogOrder";
 
 /** Slot kinds an admin can put behind a credit threshold, with their names. */
@@ -55,12 +56,27 @@ export function takesCreditUnlockDefaults(catalog: OrderableCatalog): boolean {
   return catalogFamilyRank(catalog) < 3;
 }
 
-export function withCreditUnlockDefaults(rules: CatalogRules, catalog: OrderableCatalog): CatalogRules {
-  if (rules.creditUnlocksSeeded || !takesCreditUnlockDefaults(catalog)) return rules;
-  const have = new Set((rules.gates ?? []).map((g) => g.id));
-  return {
-    ...rules,
-    gates: [...(rules.gates ?? []), ...CREDIT_UNLOCK_DEFAULTS.filter((d) => !have.has(d.id))],
-    creditUnlocksSeeded: true,
-  };
+/** Pregrado defaults added to plans that predate them, once each (the flag
+ * keeps an admin's later deletion): the credit thresholds and the
+ * "Requisito segundo idioma" attestation (placed after the English one). */
+export function withRuleDefaults(rules: CatalogRules, catalog: OrderableCatalog): CatalogRules {
+  if (!takesCreditUnlockDefaults(catalog)) return rules;
+  let out = rules;
+  if (!out.creditUnlocksSeeded) {
+    const have = new Set((out.gates ?? []).map((g) => g.id));
+    out = {
+      ...out,
+      gates: [...(out.gates ?? []), ...CREDIT_UNLOCK_DEFAULTS.filter((d) => !have.has(d.id))],
+      creditUnlocksSeeded: true,
+    };
+  }
+  if (!out.secondLanguageSeeded) {
+    const atts = [...(out.attestations ?? [])];
+    if (!atts.some((a) => a.id === SECOND_LANGUAGE_ATTESTATION.id)) {
+      const english = atts.findIndex((a) => a.id === "idioma");
+      atts.splice(english >= 0 ? english + 1 : atts.length, 0, SECOND_LANGUAGE_ATTESTATION);
+    }
+    out = { ...out, attestations: atts, secondLanguageSeeded: true };
+  }
+  return out;
 }

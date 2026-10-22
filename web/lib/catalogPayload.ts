@@ -6,7 +6,7 @@
 import { prisma } from "./db";
 import { termLabel } from "./term";
 import { sortCatalogs } from "./catalogOrder";
-import { withCreditUnlockDefaults } from "./creditUnlocks";
+import { withRuleDefaults } from "./creditUnlocks";
 import type {
   CatalogPayload,
   CatalogRules,
@@ -258,6 +258,10 @@ export async function buildCatalogPayload(slug: string): Promise<CatalogPayload 
     roles: e.roles as unknown as ElectiveDTO["roles"],
     isCursoIntegrador: !!e.isCursoIntegrador,
     offeredTerms: (e.offeredTerms as unknown as string[] | null) ?? [],
+    frequency: (e.frequency as ElectiveDTO["frequency"]) ?? null,
+    lastOfferedTerm: e.lastOfferedTerm,
+    registroCredits: e.registroCredits,
+    registroPrereqText: e.registroPrereqText,
   }));
 
   return {
@@ -283,7 +287,7 @@ export async function buildCatalogPayload(slug: string): Promise<CatalogPayload 
     offerings,
     siblings,
     electives,
-    rules: withCreditUnlockDefaults(
+    rules: withRuleDefaults(
       ((catalog.rules as CatalogRules | null) ?? { gates: [], attestations: [] }) as CatalogRules,
       catalog
     ),

@@ -7,7 +7,7 @@
 // (one name). Section rows per prefix are cached for a few minutes so the two
 // routes and repeat visits don't re-hit the API.
 
-import { fetchSections, groupByCode, urlByPrefix } from "./shared-oferta/fetcher";
+import { fetchCourseDetails, fetchSections, groupByCode, urlByPrefix, urlCourseDetails } from "./shared-oferta/fetcher";
 import type { SeccionAPI } from "./shared-oferta/ofertaDeCursosAPI";
 import { tokenSetRatio } from "./import/textMatch";
 import { normalizeCode } from "./import/normalizeCode";
@@ -68,7 +68,11 @@ export function matchElective(
   knownCode?: string | null
 ): OfferingMatch | null {
   const code = knownCode ? normalizeCode(knownCode) : "";
-  if (code && byCode.has(code)) return toMatch(code, byCode.get(code)!, 1);
+  if (code) {
+    // a known code that isn't in the offering means "not taught this term" —
+    // never fall back to a title guess, which could pick another course
+    return byCode.has(code) ? toMatch(code, byCode.get(code)!, 1) : null;
+  }
   let best: { code: string; score: number; secs: SeccionAPI[] } | null = null;
   for (const [c, secs] of byCode) {
     const score = tokenSetRatio(name, String(secs[0]?.title ?? ""));
@@ -76,4 +80,25 @@ export function matchElective(
   }
   if (!best || best.score < MIN_MATCH_SCORE) return null;
   return toMatch(best.code, best.secs, best.score);
+}
+
+const detailsCache = new Map<string, { at: number; prereqText: string | null | undefined }>();
+
+/** This term's prerequisite expression for an offered course (from its first
+ * section's course details): a string, "" when the API lists none, or
+ * undefined when the details couldn't be read. Cached like the sections. */
+export async function offeringPrereqText(term: string, code: string, secs: SeccionAPI[]): Promise<string | undefined> {
+  const key = `${term}:${code}`;
+  const hit = detailsCache.get(key);
+  if (hit && Date.now() - hit.at < TTL_MS) return hit.prereqText ?? undefined;
+  const s = secs[0];
+  let prereqText: string | undefined;
+  try {
+    const d = s ? await fetchCourseDetails(urlCourseDetails(term, String(s.ptrm ?? ""), s.nrc), { timeoutMs: 7000, retries: 1 }) : null;
+    prereqText = d ? (d.prereq[0]?.code ?? "").trim() : undefined;
+  } catch {
+    prereqText = undefined;
+  }
+  detailsCache.set(key, { at: Date.now(), prereqText });
+  return prereqText;
 }

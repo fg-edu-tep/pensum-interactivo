@@ -63,6 +63,11 @@ export default function GradoChecklist({
                   ) : null}
                 </span>
               </label>
+              {a.infoUrl && (
+                <a className="grado-info" href={a.infoUrl} target="_blank" rel="noopener noreferrer">
+                  Más información →
+                </a>
+              )}
             </li>
           ))}
         </ul>

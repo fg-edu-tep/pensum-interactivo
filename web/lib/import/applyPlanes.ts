@@ -322,6 +322,7 @@ export async function applyPlanesJob(
             attestations,
             gates: [...gates, ...keptUnlocks],
             ...(prev?.creditUnlocksSeeded ? { creditUnlocksSeeded: true } : {}),
+            ...(prev?.secondLanguageSeeded ? { secondLanguageSeeded: true } : {}),
           } as unknown as Prisma.InputJsonValue;
           await tx.catalog.update({ where: { id: catId }, data: { rules } });
         }

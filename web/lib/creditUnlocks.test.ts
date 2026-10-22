@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import type { CatalogRules, Course } from "./types";
 import { courseAvailability, catalogCodesOf } from "./availability";
-import { CREDIT_UNLOCK_DEFAULTS, withCreditUnlockDefaults } from "./creditUnlocks";
+import { CREDIT_UNLOCK_DEFAULTS, withRuleDefaults } from "./creditUnlocks";
 
 const course = (p: Partial<Course>): Course => ({
   id: "X",
@@ -34,7 +34,7 @@ const cbu = slot("ph-cbu-s1-1", "CBU", 1);
 const real = course({ id: "IELE1002", codeNormalized: "IELE1002", semester: 6, type: "nucleo" });
 const all = [efi, ele, cle, ci, cbu, real];
 const codes = catalogCodesOf(all);
-const rules: CatalogRules = withCreditUnlockDefaults({ gates: [], attestations: [] }, { slug: "ielc-cbu3", programName: "Ingeniería Electrónica" });
+const rules: CatalogRules = withRuleDefaults({ gates: [], attestations: [] }, { slug: "ielc-cbu3", programName: "Ingeniería Electrónica" });
 
 const status = (c: Course, credits: number) =>
   courseAvailability(c, new Set(), codes, all, { rules, approvedCredits: credits });
@@ -77,13 +77,23 @@ test("a locked slot marked as seen counts as approved", () => {
 test("defaults are added once, never to maestrías, and an admin's deletion sticks", () => {
   assert.equal(rules.gates.length, 3);
   assert.equal(rules.creditUnlocksSeeded, true);
-  const master = withCreditUnlockDefaults({ gates: [], attestations: [] }, { slug: "m-iele", programName: "Maestría en Ingeniería Eléctrica" });
+  const master = withRuleDefaults({ gates: [], attestations: [] }, { slug: "m-iele", programName: "Maestría en Ingeniería Eléctrica" });
   assert.equal(master.gates.length, 0);
   const edited = { gates: [CREDIT_UNLOCK_DEFAULTS[0]], attestations: [], creditUnlocksSeeded: true };
-  assert.equal(withCreditUnlockDefaults(edited, { slug: "iele-cbu3" }).gates.length, 1);
+  assert.equal(withRuleDefaults(edited, { slug: "iele-cbu3" }).gates.length, 1);
   // an admin value with a default id is kept, not duplicated
   const custom = { gates: [{ ...CREDIT_UNLOCK_DEFAULTS[0], condition: { minCredits: 60 } }], attestations: [] };
-  const merged = withCreditUnlockDefaults(custom, { slug: "iele-cbu3" });
+  const merged = withRuleDefaults(custom, { slug: "iele-cbu3" });
   assert.equal(merged.gates.filter((g) => g.id === "creditos-efi").length, 1);
   assert.equal(merged.gates.find((g) => g.id === "creditos-efi")!.condition.minCredits, 60);
+});
+
+test("the Requisito segundo idioma attestation is added once, right after the English one", () => {
+  const base = { gates: [], attestations: [{ id: "idioma", label: "Lectura en inglés" }, { id: "saberpro", label: "Saber Pro" }] };
+  const r = withRuleDefaults(base, { slug: "iele-cbu3" });
+  assert.deepEqual(r.attestations.map((a) => a.id), ["idioma", "segundo-idioma", "saberpro"]);
+  assert.match(r.attestations[1].infoUrl ?? "", /requisito-de-dominio-en-segunda-lengua/);
+  // an admin who removed it keeps it removed
+  const removed = { ...r, attestations: r.attestations.filter((a) => a.id !== "segundo-idioma") };
+  assert.equal(withRuleDefaults(removed, { slug: "iele-cbu3" }).attestations.length, 2);
 });

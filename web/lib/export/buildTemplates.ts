@@ -353,6 +353,14 @@ export async function buildPlanesWorkbook(): Promise<ExcelJS.Workbook> {
 
 // ---------- ELECTIVAS.xlsx ----------
 
+/** "SE DICTA" values the electives parser reads back (parseFrequency). */
+const FREQUENCY_TEXT: Record<string, string> = {
+  s1: "Primer semestre",
+  s2: "Segundo semestre",
+  both: "Ambos",
+  biennial: "Cada dos años",
+};
+
 export async function buildElectivasWorkbook(): Promise<ExcelJS.Workbook> {
   const wb = new ExcelJS.Workbook();
   wb.creator = "Pensum Interactivo — plantillas";
@@ -373,11 +381,13 @@ export async function buildElectivasWorkbook(): Promise<ExcelJS.Workbook> {
     { header: "Nivel", key: "level", width: 12 },
     { header: "Ciclo (maestría)", key: "ciclo", width: 24 },
     { header: "Código (opcional)", key: "code", width: 14 },
+    // blank = derived from the Registro history at seed time
+    { header: "Se dicta", key: "freq", width: 18 },
   ];
   styleHeader(ws.getRow(1), "FF0E8A95");
   ws.getColumn("name").alignment = { wrapText: true, vertical: "top" };
   ws.getColumn("ci").alignment = { horizontal: "center" };
-  ws.autoFilter = { from: "A1", to: "J1" };
+  ws.autoFilter = { from: "A1", to: "K1" };
 
   const electives = await prisma.elective.findMany({ orderBy: { name: "asc" } });
   const roleText = (cell: { norm: string | null; raw: string } | undefined) => {
@@ -403,6 +413,7 @@ export async function buildElectivasWorkbook(): Promise<ExcelJS.Workbook> {
       level: LEVEL_LABEL[e.level] ?? e.level,
       ciclo: e.ciclo ?? "",
       code: e.code ?? "",
+      freq: e.frequencySource === "excel" && e.frequency ? FREQUENCY_TEXT[e.frequency] ?? "" : "",
     });
     if (e.isCursoIntegrador) {
       row.getCell("ci").font = { bold: true, color: { argb: "FF166534" } };
@@ -423,6 +434,11 @@ export async function buildElectivasWorkbook(): Promise<ExcelJS.Workbook> {
     type: "list",
     allowBlank: false,
     formulae: ['"Sí,No"'],
+  });
+  addValidation(ws, `K2:K${lastRow}`, {
+    type: "list",
+    allowBlank: true,
+    formulae: ['"Primer semestre,Segundo semestre,Ambos,Cada dos años"'],
   });
   addValidation(ws, `H2:H${lastRow}`, {
     type: "list",

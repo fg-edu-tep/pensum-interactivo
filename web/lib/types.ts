@@ -132,6 +132,13 @@ export interface ElectiveDTO {
   /** counts toward the "Curso Integrador" slot ("ES CURSO INTEGRADOR" in the bag) */
   isCursoIntegrador: boolean;
   offeredTerms: string[];
+  /** usual offering ("SE DICTA" in the bag, else derived from Registro) */
+  frequency?: "s1" | "s2" | "both" | "biennial" | null;
+  /** newest Registro period it was taught in (≤ the seed term) */
+  lastOfferedTerm?: string | null;
+  /** Registro data at that period — the fallback when this term's API has none */
+  registroCredits?: number | null;
+  registroPrereqText?: string | null;
 }
 
 /** Synthetic node for the English-reading graduation requirement (point 5).
@@ -150,6 +157,8 @@ export interface Attestation {
   id: string;
   label: string;
   description?: string;
+  /** "Más información" link shown in the Checklist de grado */
+  infoUrl?: string;
   /** courses whose prereq tree references a code matching this regex are locked
    * until the student checks this attestation (covers "language requirement") */
   autoGatePrereqRegex?: string;
@@ -185,6 +194,8 @@ export interface CatalogRules {
   /** set once the default credit thresholds (lib/creditUnlocks.ts) were added,
    * so an admin who removes one doesn't get it back */
   creditUnlocksSeeded?: boolean;
+  /** set once the "Requisito segundo idioma" attestation was added (same idea) */
+  secondLanguageSeeded?: boolean;
 }
 
 /** A real elective a student has dropped into an elective slot (Mi avance mode). */

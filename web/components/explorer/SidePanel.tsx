@@ -17,6 +17,7 @@ import { ChevronRightIcon, CloseIcon, CheckIcon, ExternalIcon, BasketIcon } from
 import styles from "./explorer.module.css";
 
 const CBU_OFERTA_URL = "https://educaciongeneral.uniandes.edu.co/cbu/";
+const CBU_RULES_URL = "https://educaciongeneral.uniandes.edu.co/transicion-de-cbu/";
 const OFERTA_CURSOS_URL = "https://ofertadecursos.uniandes.edu.co/";
 const ELECTIVE_SLOT_KINDS = new Set(["ELECTIVA", "EFI", "CI"]);
 
@@ -360,6 +361,10 @@ export default function SidePanel({
               slotCredits={course.credits}
               integradorOnly={kind === "CI"}
               onAssign={(a) => onAssignElective(course.id, a)}
+              allCourses={allCourses}
+              approved={approved}
+              catalogCodes={catalogCodes}
+              onSelectCourse={onSelectCourse}
             />
           </div>
         )}
@@ -367,7 +372,17 @@ export default function SidePanel({
         {isCbuSlot && (
           <div className={styles.sectionGap} style={{ borderLeft: "3px solid var(--t-cbu)", paddingLeft: 10 }}>
             <h3>Oferta de CBU</h3>
-            <p style={{ fontSize: 12.5, color: "var(--muted)" }}>Elige cualquier Ciclo Básico Uniandino vigente que aún no hayas cursado.</p>
+            <p style={{ fontSize: 12.5, color: "var(--muted)" }}>Elige un Ciclo Básico Uniandino vigente que aún no hayas cursado.</p>
+            <div className={styles.cbuRules}>
+              <strong>Ojo con la combinación de CBU</strong>
+              <ul>
+                <li>1 CBU de Colombia</li>
+                <li>2 CBU libres</li>
+              </ul>
+              <a href={CBU_RULES_URL} target="_blank" rel="noopener noreferrer">
+                Ver las reglas completas (transición de CBU) →
+              </a>
+            </div>
             <a href={CBU_OFERTA_URL} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)", fontSize: 12.5, fontWeight: 600 }}>
               Ver la oferta de CBU →
             </a>

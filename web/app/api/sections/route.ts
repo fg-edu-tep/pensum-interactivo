@@ -23,9 +23,9 @@ import {
 export const dynamic = "force-dynamic";
 
 const CODE_RE = /^[A-Z]{2,6}\d{3,4}[A-Z]?$/;
-const MAX_CODES = 12;
+const MAX_CODES = 30;
 const TTL_MS = 10 * 60 * 1000;
-const cache = new Map<string, { at: number; value: CourseSections | null }>();
+const cache = new Map<string, { at: number; value: Map<string, SectionInfo[]> | null }>();
 
 const DAY_KEYS = ["l", "m", "i", "j", "v", "s", "d"] as const;
 
@@ -65,18 +65,28 @@ function toSection(r: SeccionAPI): SectionInfo {
   };
 }
 
-async function lookup(code: string, term: string): Promise<SectionInfo[] | null> {
+/** Sections of `code` and of its companions — the same code plus one letter
+ * (IELE2100L laboratorio, MATE1203C complementaria, …P práctica, …T taller).
+ * nameInput matches loosely, so one call returns both. Keyed by exact code;
+ * `code` itself is always present (possibly empty). */
+async function lookup(code: string, term: string): Promise<Map<string, SectionInfo[]> | null> {
   const key = `${term}:${code}`;
   const hit = cache.get(key);
-  if (hit && Date.now() - hit.at < TTL_MS) return hit.value ? hit.value.sections : null;
+  if (hit && Date.now() - hit.at < TTL_MS) return hit.value;
   try {
     const rows = await fetchSections(urlByCourse(code, term), { timeoutMs: 8000, retries: 1 });
-    // nameInput matches loosely — keep exact "<class><course>" only (drops labs like 1002L)
-    const exact = rows.filter((r) => `${r.class}${r.course}`.toUpperCase() === code);
-    const sections = exact.map(toSection);
-    cache.set(key, { at: Date.now(), value: { term, requestedTerm: term, isReference: false, sections } });
-    return sections;
+    const byCode = new Map<string, SectionInfo[]>([[code, []]]);
+    const companionRe = new RegExp(`^${code}[A-Z]$`);
+    for (const r of rows) {
+      const c = `${r.class}${r.course}`.toUpperCase();
+      if (c !== code && !companionRe.test(c)) continue;
+      if (!byCode.has(c)) byCode.set(c, []);
+      byCode.get(c)!.push(toSection(r));
+    }
+    cache.set(key, { at: Date.now(), value: byCode });
+    return byCode;
   } catch {
+    cache.set(key, { at: Date.now(), value: null });
     return null;
   }
 }
@@ -98,26 +108,32 @@ export async function GET(req: Request) {
   // resolved lazily: only needed when the requested term has no rows
   let referenceTerm: string | null = null;
 
-  const out: SectionsResponse = { courses: {}, failed: [] };
+  const out: SectionsResponse = { courses: {}, failed: [], companions: {} };
   await Promise.all(
     codes.map(async (code) => {
-      let sections = await lookup(code, requestedTerm);
+      let found = await lookup(code, requestedTerm);
       let term = requestedTerm;
-      if (sections && sections.length === 0) {
+      if (found && (found.get(code) ?? []).length === 0) {
         referenceTerm ??= (await resolveOfferingTerm()).term;
         if (referenceTerm !== requestedTerm) {
           const ref = await lookup(code, referenceTerm);
-          if (ref && ref.length > 0) {
-            sections = ref;
+          if (ref && (ref.get(code) ?? []).length > 0) {
+            found = ref;
             term = referenceTerm;
           }
         }
       }
-      if (sections === null) {
+      if (found === null) {
         out.failed.push(code);
         return;
       }
-      out.courses[code] = { term, requestedTerm, isReference: term !== requestedTerm, sections };
+      for (const [c, sections] of found) {
+        // an explicitly requested code wins over the same code seen as a companion
+        if (c !== code && out.courses[c] && codes.includes(c)) continue;
+        out.courses[c] = { term, requestedTerm, isReference: term !== requestedTerm, sections };
+      }
+      const comps = [...found.keys()].filter((c) => c !== code);
+      if (comps.length) out.companions![code] = comps;
     })
   );
   return NextResponse.json(out, { headers: { "Cache-Control": "private, max-age=120" } });

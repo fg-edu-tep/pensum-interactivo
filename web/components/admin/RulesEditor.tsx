@@ -199,6 +199,15 @@ export default function RulesEditor({
               />
             </div>
             <div>
+              <label>Enlace “Más información”</label>
+              <input
+                className="admin-input"
+                value={a.infoUrl ?? ""}
+                placeholder="https://…"
+                onChange={(e) => updAtt(i, { infoUrl: e.target.value || undefined })}
+              />
+            </div>
+            <div>
               <label>autoGatePrereqRegex</label>
               <input
                 className={`admin-input${!reOk(a.autoGatePrereqRegex) ? " dirty" : ""}`}

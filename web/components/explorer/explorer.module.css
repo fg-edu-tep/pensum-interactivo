@@ -2932,3 +2932,39 @@
 /* a footer button that takes its own row (e.g. "Agregar a mi canasta" above
    "Marcar como vista" + "Ver secciones") */
 .panelFooter .btnFullRow { flex: 1 0 100%; }
+
+/* basket: obligatory companions (labs, complementarias) */
+.bkCoreqNotice {
+  margin: 0 0 10px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--st-warn) 10%, white);
+  border: 1px solid color-mix(in srgb, var(--st-warn) 35%, white);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+.bkCompanion { margin-left: 28px; border-left: 3px solid var(--st-warn); }
+.bkObligatory {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--st-warn) 14%, white);
+  color: var(--st-warn);
+}
+
+/* CBU slot: the combination rule (1 de Colombia + 2 libres) */
+.cbuRules {
+  margin: 8px 0 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--t-cbu) 7%, white);
+  border: 1px solid color-mix(in srgb, var(--t-cbu) 25%, white);
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+.cbuRules strong { display: block; color: var(--t-cbu); margin-bottom: 4px; }
+.cbuRules ul { margin: 0 0 6px; padding-left: 18px; }
+.cbuRules a { color: var(--accent); font-weight: 600; text-decoration: none; }
+.cbuRules a:hover { text-decoration: underline; }
