@@ -9,6 +9,7 @@ import type {
   OfferingBadge,
 } from "@/lib/types";
 import ElectivePicker from "./ElectivePicker";
+import EngineeringElectivePicker from "./EngineeringElectivePicker";
 import ChainMiniature from "./ChainMiniature";
 import RequirementTree from "./RequirementTree";
 import { groupClass, groupColor, groupOf, spaceCode, toSentenceCase, nextTermCode, nextTermShort, termShort } from "./format";
@@ -16,8 +17,20 @@ import { ChevronRightIcon, CloseIcon, CheckIcon, ExternalIcon, BasketIcon } from
 import styles from "./explorer.module.css";
 
 const CBU_OFERTA_URL = "https://educaciongeneral.uniandes.edu.co/cbu/";
+const CBU_RULES_URL = "https://educaciongeneral.uniandes.edu.co/transicion-de-cbu/";
 const OFERTA_CURSOS_URL = "https://ofertadecursos.uniandes.edu.co/";
 const ELECTIVE_SLOT_KINDS = new Set(["ELECTIVA", "EFI", "CI"]);
+
+/** "Electiva en Fundamentos de Ingeniería" — classified EFI, or an ELECTIVA
+ * slot whose label says so ("ELECTIVA EN FUND. ING."). */
+function isEfiSlot(course: Course): boolean {
+  if (course.placeholderKind === "EFI") return true;
+  const label = `${course.placeholderLabel ?? ""} ${course.name}`
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase();
+  return /FUNDAMENTOS? DE INGENIER|FUND\.? ?(DE )?ING/.test(label);
+}
 
 const TYPE_LABEL: Record<Course["type"], string> = {
   nucleo: "Núcleo",
@@ -49,6 +62,22 @@ function DescriptionBlock({ text }: { text: string }) {
       )}
     </div>
   );
+}
+
+/** Where the requirements shown come from (lib/requirementResolve.ts priority). */
+function sourceLine(course: Course, term: string): string | null {
+  switch (course.prereqSource) {
+    case "api":
+      return `Requisitos según la oferta oficial de ${termShort(term)}.`;
+    case "document":
+      return "Requisitos según el documento del programa (no hay datos de la oferta en línea para este periodo).";
+    case "registro":
+      return `Requisitos según Registro${course.prereqSourceTerm ? ` (${termShort(course.prereqSourceTerm)})` : ""}: este curso no tiene datos en la oferta de ${termShort(term)}.`;
+    case "api-history":
+      return `Requisitos según la oferta oficial de ${termShort(course.prereqSourceTerm ?? "")}, la última vez que se dictó.`;
+    default:
+      return null;
+  }
 }
 
 function seatsText(seats: [number, number] | undefined): string {
@@ -277,6 +306,7 @@ export default function SidePanel({
               approved={approved}
               onSelectCourse={onSelectCourse}
             />
+            {sourceLine(course, term) && <p className={styles.requirementSource}>{sourceLine(course, term)}</p>}
           </div>
         )}
 
@@ -306,7 +336,19 @@ export default function SidePanel({
 
         {course.description && <DescriptionBlock text={course.description} />}
 
-        {isElectiveSlot && (
+        {isElectiveSlot && isEfiSlot(course) && (
+          <div className={styles.slotPanelSection}>
+            <EngineeringElectivePicker
+              term={term}
+              mode={mode}
+              assignment={assignment}
+              slotCredits={course.credits}
+              onAssign={(a) => onAssignElective(course.id, a)}
+            />
+          </div>
+        )}
+
+        {isElectiveSlot && !isEfiSlot(course) && (
           <div className={styles.slotPanelSection}>
             <ElectivePicker
               electives={electives}
@@ -319,6 +361,10 @@ export default function SidePanel({
               slotCredits={course.credits}
               integradorOnly={kind === "CI"}
               onAssign={(a) => onAssignElective(course.id, a)}
+              allCourses={allCourses}
+              approved={approved}
+              catalogCodes={catalogCodes}
+              onSelectCourse={onSelectCourse}
             />
           </div>
         )}
@@ -326,7 +372,17 @@ export default function SidePanel({
         {isCbuSlot && (
           <div className={styles.sectionGap} style={{ borderLeft: "3px solid var(--t-cbu)", paddingLeft: 10 }}>
             <h3>Oferta de CBU</h3>
-            <p style={{ fontSize: 12.5, color: "var(--muted)" }}>Elige cualquier Ciclo Básico Uniandino vigente que aún no hayas cursado.</p>
+            <p style={{ fontSize: 12.5, color: "var(--muted)" }}>Elige un Ciclo Básico Uniandino vigente que aún no hayas cursado.</p>
+            <div className={styles.cbuRules}>
+              <strong>Ojo con la combinación de CBU</strong>
+              <ul>
+                <li>1 CBU de Colombia</li>
+                <li>2 CBU libres</li>
+              </ul>
+              <a href={CBU_RULES_URL} target="_blank" rel="noopener noreferrer">
+                Ver las reglas completas (transición de CBU) →
+              </a>
+            </div>
             <a href={CBU_OFERTA_URL} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)", fontSize: 12.5, fontWeight: 600 }}>
               Ver la oferta de CBU →
             </a>
@@ -345,31 +401,51 @@ export default function SidePanel({
       </div>
 
       <div className={styles.panelFooter}>
-        {mode === "explore" || course.isPlaceholder ? (
+        {mode === "explore" ? (
           <button className={styles.btnPrimary} onClick={() => onToggleApproved(course.id)}>
             <CheckIcon />
-            {approved.has(course.id)
-              ? mode === "explore" ? "Desmarcar aprobada" : "Desmarcar"
-              : mode === "explore" ? "Marcar aprobada" : "Marcar como vista"}
+            {approved.has(course.id) ? "Desmarcar aprobada" : "Marcar aprobada"}
           </button>
         ) : approved.has(course.id) ? (
           <button className={styles.btnPrimary} onClick={() => onToggleApproved(course.id)}>
             Desmarcar
           </button>
         ) : (
-          <button
-            className={styles.btnPrimary}
-            disabled={gateReasons.length > 0 || (!isPlanned && !plannable)}
-            title={!isPlanned && !plannable ? "Aún no cumples los prerrequisitos (vistos + planeados)" : undefined}
-            onClick={() => onTogglePlanned(course.id, isPlanned ? null : nextTermCode())}
-          >
-            {!isPlanned && plannable && <BasketIcon size={15} />}
-            {isPlanned
-              ? "Quitar de la canasta"
-              : plannable
-                ? `Agregar a mi canasta · ${nextTermShort()}`
-                : "Requiere cursos previos"}
-          </button>
+          <>
+            {/* Mi avance: real courses and CBU slots can go in the basket;
+                every course and slot can be marked as seen, locked or not
+                (homologaciones, cursos vistos fuera del orden sugerido). */}
+            {(!course.isPlaceholder || isCbuSlot) && (
+              <button
+                className={`${styles.btnPrimary} ${styles.btnFullRow}`}
+                disabled={!isPlanned && (gateReasons.length > 0 || !plannable)}
+                title={
+                  !isPlanned && gateReasons.length > 0
+                    ? gateReasons.join(" · ")
+                    : !isPlanned && !plannable
+                      ? "Aún no cumples los prerrequisitos (vistos + planeados)"
+                      : undefined
+                }
+                onClick={() => onTogglePlanned(course.id, isPlanned ? null : nextTermCode())}
+              >
+                {!isPlanned && plannable && gateReasons.length === 0 && <BasketIcon size={15} />}
+                {isPlanned
+                  ? "Quitar de la canasta"
+                  : gateReasons.length > 0
+                    ? "Aún bloqueado"
+                    : plannable
+                      ? `Agregar a mi canasta · ${nextTermShort()}`
+                      : "Requiere cursos previos"}
+              </button>
+            )}
+            <button
+              className={!course.isPlaceholder || isCbuSlot ? styles.btnGhostFooter : styles.btnPrimary}
+              onClick={() => onToggleApproved(course.id)}
+            >
+              <CheckIcon />
+              Marcar como vista
+            </button>
+          </>
         )}
         {!course.isPlaceholder && link && (
           <a href={link} target="_blank" rel="noopener noreferrer" className={styles.btnGhostFooter}>

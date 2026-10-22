@@ -230,6 +230,22 @@ model Elective {
   isCursoIntegrador Boolean @default(false) // "ES CURSO INTEGRADOR" flag in the bag
   offeredTerms   Json // string[]  e.g. ["202620"]
   sourceFiles    Json // string[]  provenance
+
+  // --- what the student sees for an elective NOT offered this term (seed):
+  //     the bag Excel first ("CÓDIGO" / "SE DICTA" columns), then the full
+  //     Registro export history. The live API covers the current term. ---
+  /** where `code` came from: "excel" (CÓDIGO column) | "registro" (name match) */
+  codeSource         String?
+  /** usual offering: "s1" (…-1 semesters) | "s2" (…-2) | "both" | "biennial" */
+  frequency          String?
+  /** "excel" (SE DICTA column) | "registro" (derived from its period history) */
+  frequencySource    String?
+  /** newest Registro period with a row for `code`, at or before the seed term */
+  lastOfferedTerm    String?
+  /** Registro data at `lastOfferedTerm` (fallback when the API has no section) */
+  registroName       String?
+  registroCredits    Float?
+  registroPrereqText String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 }

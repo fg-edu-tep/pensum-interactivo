@@ -3,21 +3,21 @@
 // data (CatalogCourse.prereqText/Tree — seed, registro wizard, manual edits)
 // disagrees with the official API data (CourseOffering.api*, synced per term).
 //
-// The governance below is a deliberate MIRROR of lib/catalogPayload.ts (the
-// student payload builder), which is intentionally left untouched. The
-// equivalence is locked by lib/discrepancy/__tests__/payloadEquivalence.test.ts,
-// which runs both against the same database and fails if they ever diverge.
+// The governance is NOT re-implemented here: both this report and the student
+// payload (lib/catalogPayload.ts) call lib/requirementResolve.ts, the one place
+// the priority is written down (live API for the catalog's term → document →
+// Registro upload → API data of another term; empty sources are skipped). The
+// equivalence is still locked by lib/discrepancy/__tests__/payloadEquivalence.test.ts.
 //
-// Precedence (confirmed as intended behaviour — "prefer API, only fall back to
-// the document"):
-//   prereq: apiTree ?? (detailsFetched && no apiText ? NONE : documentTree)
-//   coreq : apiTree ?? (detailsFetched ? NONE : documentTree)
-//   detailsFetched = detailsSyncedAt set && no detailsError, for catalog.term
+// `governor` stays two-valued for the alerts: "api" when the live API for the
+// catalog's term decides, "document" otherwise (the document or, when it is
+// empty, one of the secondary sources — `source` says which).
 //
 // Pure: no I/O.
 
-import type { ReqNode } from "../types";
+import type { ReqNode, RequirementSource } from "../types";
 import { renderRegistroExpr } from "../registro/requirements";
+import { resolveRequirement, type ApiDetails, type RegistroEntry } from "../requirementResolve";
 import { compareTrees } from "./compare";
 
 export type Field = "prereq" | "coreq";
@@ -67,12 +67,18 @@ export interface CourseInput {
   lockedFields: string[];
   /** the offering for the CATALOG's term (null when there is none) */
   offering: OfferingInput | null;
+  /** secondary sources used when the API and the document have nothing */
+  registro?: RegistroEntry | null;
+  history?: ApiDetails[];
 }
 
 export interface FieldReport {
   field: Field;
   /** who decides what students see */
   governor: Governor;
+  /** the exact source students get (null: no source has data) */
+  source: RequirementSource;
+  sourceTerm: string | null;
   status: Status;
   severity: Severity;
   /** the tree students actually get (same as catalogPayload) */
@@ -101,23 +107,43 @@ export function detailsFetched(o: OfferingInput | null): boolean {
   return !!o?.detailsSyncedAt && !o?.detailsError;
 }
 
-/** The exact tree students get — mirrors lib/catalogPayload.ts. */
+function currentDetails(o: OfferingInput | null): ApiDetails | null {
+  return o
+    ? {
+        term: "",
+        detailsSyncedAt: o.detailsSyncedAt,
+        detailsError: o.detailsError,
+        apiPrereqText: o.apiPrereqText,
+        apiPrereqTree: o.apiPrereqTree,
+        apiCoreqTree: o.apiCoreqTree,
+      }
+    : null;
+}
+
+/** The exact tree/text students get (lib/requirementResolve.ts, as the payload). */
 export function effectiveTree(
   field: Field,
   o: OfferingInput | null,
-  docTree: ReqNode | null
-): { tree: ReqNode | null; governor: Governor } {
-  const fetched = detailsFetched(o);
-  if (field === "prereq") {
-    const apiTree = o?.apiPrereqTree ?? null;
-    if (apiTree) return { tree: apiTree, governor: "api" };
-    if (fetched && !o?.apiPrereqText) return { tree: null, governor: "api" };
-    return { tree: docTree, governor: "document" };
-  }
-  const apiTree = o?.apiCoreqTree ?? null;
-  if (apiTree) return { tree: apiTree, governor: "api" };
-  if (fetched) return { tree: null, governor: "api" };
-  return { tree: docTree, governor: "document" };
+  docTree: ReqNode | null,
+  extra: { docText?: string | null; registro?: RegistroEntry | null; history?: ApiDetails[] } = {}
+): { tree: ReqNode | null; governor: Governor; source: RequirementSource; sourceTerm: string | null; text: string } {
+  const docText = extra.docText ?? null;
+  const r = resolveRequirement(field, {
+    current: currentDetails(o),
+    document:
+      field === "prereq"
+        ? { prereqText: docText, prereqTree: docTree, coreqText: null, coreqTree: null }
+        : { prereqText: null, prereqTree: null, coreqText: docText, coreqTree: docTree },
+    registro: extra.registro ?? null,
+    history: extra.history ?? [],
+  });
+  return {
+    tree: r.tree,
+    governor: r.source === "api" ? "api" : "document",
+    source: r.source,
+    sourceTerm: r.source === "api" ? null : r.sourceTerm,
+    text: r.text,
+  };
 }
 
 function unverifiedReason(o: OfferingInput | null, field: Field): UnverifiedReason {
@@ -152,18 +178,17 @@ export function reportField(c: CourseInput, field: Field): FieldReport {
   const docText = (field === "prereq" ? c.docPrereqText : c.docCoreqText) ?? "";
   const apiTree = field === "prereq" ? (o?.apiPrereqTree ?? null) : (o?.apiCoreqTree ?? null);
   const apiText = field === "prereq" ? (o?.apiPrereqText ?? "") : renderRegistroExpr(apiTree);
-  const { tree: visible, governor } = effectiveTree(field, o, docTree);
-
-  // The TEXT the student payload shows is chosen differently from the tree:
-  //   prereqText = apiPrereqTree ? apiText : document text   (even when the API says "none")
-  //   coreqText  = always the document's coreqText
-  // Mirrored as-is (payload intentionally untouched); see docs/admin-discrepancies.md
-  // "Known inconsistencies in the student payload".
-  const visibleText = field === "prereq" ? (apiTree ? apiText : docText) : docText;
+  const { tree: visible, governor, source, sourceTerm, text: visibleText } = effectiveTree(field, o, docTree, {
+    docText,
+    registro: c.registro,
+    history: c.history,
+  });
 
   const base = {
     field,
     governor,
+    source,
+    sourceTerm,
     visible,
     visibleText,
     apiText,
@@ -264,32 +289,41 @@ export const UNVERIFIED_LABEL: Record<UnverifiedReason, string> = {
 
 const FIELD_NAME = { prereq: "prerrequisitos", coreq: "correquisitos" } as const;
 
+function termShort(t: string | null | undefined): string {
+  return t && /^\d{6}$/.test(t) ? `${t.slice(0, 4)}-${t.slice(4, 5)}` : t ?? "";
+}
+
+/** What students see when the API of the catalog's term has nothing. */
+function fallbackClause(f: Partial<Pick<FieldReport, "source" | "sourceTerm">>): string {
+  if (f.source === "registro")
+    return `el documento está vacío, los estudiantes ven los del Registro${f.sourceTerm ? ` (${termShort(f.sourceTerm)})` : ""}`;
+  if (f.source === "api-history")
+    return `el documento está vacío, los estudiantes ven los de la API de ${termShort(f.sourceTerm)}`;
+  if (f.source === null) return "ninguna fuente tiene datos: los estudiantes no ven requisitos";
+  return "los estudiantes ven el documento tal cual";
+}
+
 /**
  * One-sentence explanation of what students see. Pure so it is unit-tested and
- * identical on every surface.
- *
- * Corequisites need an extra caveat: the explorer draws them from the tree
- * (API first) but the enrolment basket prints the DOCUMENT's coreqText as a chip
- * regardless of who governs (components/explorer/BasketModal.tsx), so a
- * document coreq that disagrees with the API can still reach students there.
+ * identical on every surface. (Every student surface, the enrolment basket
+ * included, now shows the text of the source that won.)
  */
-export function headlineFor(f: Pick<FieldReport, "field" | "status" | "unverifiedReason" | "documentText">): string {
+export function headlineFor(
+  f: Pick<FieldReport, "field" | "status" | "unverifiedReason" | "documentText"> &
+    Partial<Pick<FieldReport, "source" | "sourceTerm">>
+): string {
   const what = FIELD_NAME[f.field];
-  const basket =
-    f.field === "coreq" && f.documentText.trim()
-      ? " Ojo: la canasta de inscripción sigue mostrando el texto del documento como nota de correquisito."
-      : "";
   switch (f.status) {
     case "differs":
-      return `Los estudiantes ven los ${what} oficiales de la API, no los del documento.${basket}`;
+      return `Los estudiantes ven los ${what} oficiales de la API, no los del documento.`;
     case "doc-hidden":
-      return `La API confirma que este curso no tiene ${what}; los del documento no se aplican en el mapa.${basket}`;
+      return `La API confirma que este curso no tiene ${what}; los del documento no se aplican en el mapa.`;
     case "api-only":
       return `La API tiene ${what} y el documento está vacío. Los estudiantes ven los de la API.`;
     case "soft-only":
       return `Mismos ${what}; solo difiere el marcador * (concurrente).`;
     case "unverified":
-      return `Sin datos oficiales (${f.unverifiedReason ? UNVERIFIED_LABEL[f.unverifiedReason] : "sin datos"}): los estudiantes ven el documento tal cual.`;
+      return `Sin datos oficiales (${f.unverifiedReason ? UNVERIFIED_LABEL[f.unverifiedReason] : "sin datos"}): ${fallbackClause(f)}.`;
     case "match":
       return `Los ${what} coinciden con la API.`;
   }

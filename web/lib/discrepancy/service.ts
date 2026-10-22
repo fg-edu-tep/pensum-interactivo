@@ -5,6 +5,7 @@
 
 import { prisma } from "../db";
 import type { ReqNode } from "../types";
+import { apiDetailsOf, loadRegistroDictionary } from "../requirementSources";
 import { reportCourse, summarize, type CourseInput, type CourseReport, type Summary } from "./report";
 
 export interface CatalogReport {
@@ -34,6 +35,10 @@ export async function loadCourseInputs(slugs?: string[]): Promise<Map<string, { 
     },
   });
 
+  const registro = await loadRegistroDictionary(
+    catalogs.flatMap((cat) => cat.courses.map((cc) => cc.course?.normalizedCode ?? "").filter(Boolean))
+  );
+
   const out = new Map<string, { meta: Omit<CatalogReport, "courses" | "summary" | "latestApiSync" | "oldestApiSync">; inputs: CourseInput[] }>();
   for (const cat of catalogs) {
     const inputs: CourseInput[] = cat.courses.map((cc) => {
@@ -60,6 +65,8 @@ export async function loadCourseInputs(slugs?: string[]): Promise<Map<string, { 
               apiCoreqTree: (o.apiCoreqTree as ReqNode | null) ?? null,
             }
           : null,
+        registro: registro.get(cc.course?.normalizedCode ?? "") ?? null,
+        history: (cc.course?.offerings ?? []).filter((x) => x.term !== cat.term).map(apiDetailsOf),
       };
     });
     out.set(cat.slug, {

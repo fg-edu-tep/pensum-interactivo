@@ -1,3 +1,4 @@
+import { normalizeCode } from "@/lib/import/normalizeCode";
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
@@ -28,7 +29,8 @@ export async function POST(req: Request) {
     data: {
       name,
       normalizedName,
-      code: String(body?.code ?? "").trim() || null,
+      code: normalizeCode(body?.code) || null,
+      codeSource: normalizeCode(body?.code) ? "admin" : null,
       level,
       ciclo: String(body?.ciclo ?? "").trim() || null,
       roles: buildRoles(body?.roles),

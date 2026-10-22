@@ -10,9 +10,18 @@
 //   "MATERIAS MAESTRIA"  name + "Ciclo"; adds ciclo metadata, level = maestria
 //   "202620"             curated subset offered that term, same 4 role columns
 //   "MAESTRIA 202620"    curated maestria subset offered that term, name only
+//
+// Optional columns, found by header text in the full grid and the maestría
+// catalogue (like "ES CURSO INTEGRADOR"); a blank cell means "derive it":
+//   "CÓDIGO"     the course code (e.g. IELE 3336) — otherwise matched by name
+//                against the Registro export at seed time
+//   "SE DICTA"   when it is usually taught: 1 / PRIMER SEMESTRE (…-1),
+//                2 / SEGUNDO SEMESTRE (…-2), AMBOS, CADA DOS AÑOS —
+//                otherwise derived from the Registro period history
 
 import * as XLSX from "xlsx";
 import { foldAccents, normalizeName } from "./textMatch";
+import { normalizeCode } from "./normalizeCode";
 
 export type RoleNorm =
   | "obligatoria"
@@ -25,6 +34,19 @@ export type RoleNorm =
   | "pasantia"
   | "maestria"
   | null;
+
+/** When an elective is usually taught. */
+export type Frequency = "s1" | "s2" | "both" | "biennial";
+
+export function parseFrequency(raw: unknown): Frequency | null {
+  const s = foldAccents(String(raw ?? "")).trim().toUpperCase();
+  if (!s) return null;
+  if (s.includes("DOS ANOS") || s.includes("BIENAL") || s.includes("CADA 2")) return "biennial";
+  if (s.includes("AMBOS") || s.includes("TODOS") || s.includes("SIEMPRE") || /1\s*(Y|,|\/)\s*2/.test(s)) return "both";
+  if (s.includes("PRIMER") || /(^|[^0-9])-?1([^0-9]|$)/.test(s)) return "s1";
+  if (s.includes("SEGUNDO") || /(^|[^0-9])-?2([^0-9]|$)/.test(s)) return "s2";
+  return null;
+}
 
 export interface RoleCell {
   norm: RoleNorm;
@@ -44,6 +66,10 @@ export interface ParsedElective {
   };
   /** "ES CURSO INTEGRADOR" column in the full grid — only a subset qualifies */
   isCursoIntegrador: boolean;
+  /** "CÓDIGO" column, normalized ("IELE3336"); null when blank/absent */
+  code: string | null;
+  /** "SE DICTA" column; null when blank/absent */
+  frequency: Frequency | null;
   offeredTerms: string[];
   sourceFiles: string[];
 }
@@ -117,6 +143,24 @@ function integradorColIndex(grid: unknown[][]): number {
   return -1;
 }
 
+/** Column index of an optional header (accent/case-insensitive), or -1. */
+function headerColIndex(grid: unknown[][], test: (folded: string) => boolean): number {
+  for (let r = 0; r < Math.min(grid.length, 4); r++) {
+    const row = grid[r] ?? [];
+    for (let c = 2; c < row.length; c++) {
+      if (test(foldAccents(String(row[c] ?? "")).trim().toUpperCase())) return c;
+    }
+  }
+  return -1;
+}
+const codeCol = (g: unknown[][]) => headerColIndex(g, (h) => h === "CODIGO" || h.startsWith("CODIGO "));
+const frequencyCol = (g: unknown[][]) => headerColIndex(g, (h) => h.includes("SE DICTA") || h.includes("FRECUENCIA"));
+
+function codeCell(raw: unknown): string | null {
+  const c = normalizeCode(raw);
+  return /^[A-Z]{3,5}\d{4}[A-Z]?$/.test(c) ? c : null;
+}
+
 /** A flag cell counts as "yes" for 1 / X / SI / VERDADERO / TRUE. */
 function truthyFlag(raw: unknown): boolean {
   const s = foldAccents(String(raw ?? "")).trim().toUpperCase();
@@ -132,6 +176,8 @@ function parseGrid(
 ) {
   const start = headerRowIndex(grid) + 1;
   const integCol = integradorColIndex(grid);
+  const cCol = codeCol(grid);
+  const fCol = frequencyCol(grid);
   let section = "PREGRADO";
   for (let r = start; r < grid.length; r++) {
     const row = grid[r] ?? [];
@@ -151,6 +197,8 @@ function parseGrid(
         elcUntil2023: cell(row[5]),
       },
       isCursoIntegrador: integCol >= 0 && truthyFlag(row[integCol]),
+      code: cCol >= 0 ? codeCell(row[cCol]) : null,
+      frequency: fCol >= 0 ? parseFrequency(row[fCol]) : null,
       offeredTerms: markTerm ? [markTerm] : [],
       sourceFiles: [fileName],
     });
@@ -164,6 +212,8 @@ function parseMaestriaCatalogue(
   out: Map<string, ParsedElective>
 ) {
   const start = headerRowIndex(grid) + 1;
+  const cCol = codeCol(grid);
+  const fCol = frequencyCol(grid);
   for (let r = start; r < grid.length; r++) {
     const row = grid[r] ?? [];
     const name = String(row[1] ?? "").trim();
@@ -181,6 +231,8 @@ function parseMaestriaCatalogue(
         elcUntil2023: EMPTY,
       },
       isCursoIntegrador: false,
+      code: cCol >= 0 ? codeCell(row[cCol]) : null,
+      frequency: fCol >= 0 ? parseFrequency(row[fCol]) : null,
       offeredTerms: [],
       sourceFiles: [fileName],
     });
@@ -209,6 +261,8 @@ function parseTermNameOnly(
         elcUntil2023: EMPTY,
       },
       isCursoIntegrador: false,
+      code: null,
+      frequency: null,
       offeredTerms: [term],
       sourceFiles: [fileName],
     });
@@ -235,6 +289,8 @@ function merge(out: Map<string, ParsedElective>, incoming: ParsedElective) {
   cur.roles.eleUntil2023 = mergeRole(cur.roles.eleUntil2023, incoming.roles.eleUntil2023);
   cur.roles.elcUntil2023 = mergeRole(cur.roles.elcUntil2023, incoming.roles.elcUntil2023);
   cur.isCursoIntegrador = cur.isCursoIntegrador || incoming.isCursoIntegrador;
+  cur.code = cur.code || incoming.code;
+  cur.frequency = cur.frequency || incoming.frequency;
   cur.offeredTerms = [...new Set([...cur.offeredTerms, ...incoming.offeredTerms])].sort();
   cur.sourceFiles = [...new Set([...cur.sourceFiles, ...incoming.sourceFiles])].sort();
 }

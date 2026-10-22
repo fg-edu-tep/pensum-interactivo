@@ -629,3 +629,93 @@ Detailed per-session entries live in `.claude/PROGRESS.md` on `mysql-migration`;
   first admin and receives the 12-word master secret. **On a public deployment, do that immediately after the first deploy.**
 - Application code is DB-portable (no raw SQL; transactions that re-check after a lock use READ COMMITTED) — rules in `docs/branches-and-releases.md`.
 
+
+## Session 2026-10-21 — onboarding/tour rework + information priority
+
+**Experience**
+- **First visit → centred welcome** (`components/explorer/IntroModal.tsx`) replaces the onboarding
+  side panel (`OnboardingPanel` now only exports `HintPill`). No backdrop/Esc dismissal; its one
+  button starts the Mi avance guide, and when the guide ends the "¿En qué punto vas?" welcome
+  (`AvanceWelcome`) opens. Key `pensum:intro-seen`; students who already finished a tour are not newcomers.
+- **Returning students → timed toast** (`RefresherToast.tsx`): "¡Hola de nuevo! ¿Necesitas un repaso?",
+  once per browser session (`sessionStorage pensum:refresher-shown`), 9 s countdown bar, pauses on hover/focus.
+- **Tour = checklist** (`Tour.tsx`, copy in `tours.ts`): every step listed up front with ✓ as they're
+  seen, card always in a fixed corner (bottom-left, flips right only if it would cover the target), the
+  target gets a dashed outline + a numbered marker matching the row (no "press me" glow), and a blocker
+  layer makes the page inert while the guide runs. Copy never commands an action ("aquí puedes…").
+  New `reltoggle` step in both tours; the example course is the one with most dependents.
+- **Relation selector** (`UnlockViewControl.tsx`): single-choice segmented toggle (radiogroup, arrow keys)
+  instead of checkboxes; the active option's question is shown under it
+  (¿qué debo aprobar antes? / ¿qué se me abre con solo aprobarlo? / ¿qué cursos lo piden, aunque pidan otros?).
+- **Catalog order** everywhere (`lib/catalogOrder.ts`): Electrónica, Eléctrica, Doble programa, Maestrías.
+
+**Business logic**
+- Era toggle ("Pensum 2024-I+ | Hasta 2023-II") removed; the picker only reads the `*From2024` role columns.
+- **EFI slot** → `EngineeringElectivePicker.tsx`: any `I***` code (`lib/engineeringCode.ts`), looked up via
+  new `GET /api/courses/lookup` (live API → `Course` row → Registro upload).
+- **Electives**: the Excel bag is the list; new `GET /api/electives/enrich` adds code/credits/sections from
+  the live offering where it matches (`lib/electiveMatch.ts`, shared with `/api/electives/resolve`,
+  10-min per-prefix cache). Unmatched or API down → Excel data, labelled as such.
+- **Requirement priority** (`lib/requirementResolve.ts`, see `docs/admin-discrepancies.md`): API (term) →
+  document → Registro upload → API of another term; empty sources are skipped. Fixes `IELE3206`
+  (taught only in `…10` terms, so no 202620 offering, and old rows had an empty document). The seed also
+  fills empty document text on kept rows (`req_filled=N`). The side panel says where the requirements came from.
+- Verified locally (Postgres 16, seeded, API unreachable from the sandbox): unit tests 161 pass / 11 skipped
+  (pre-existing scratch-DB skips), payload-equivalence test passes, `npm run build` passes, browser pass of
+  intro → checklist tour → welcome, refresher toast, toggle, EFI lookup and elective fallback, 390 px width.
+  **Not verified:** the live-API enrichment path (the sandbox can't reach ofertadecursos.uniandes.edu.co).
+
+## Session 2026-10-22 — credit thresholds for slots + "marcar como vista" everywhere (stacked on PR #3)
+
+- **Desbloqueo por créditos** (`lib/creditUnlocks.ts`). Slots (EFI, electivas, CLE, curso integrador, CBU)
+  can be locked in Mi avance until the student has declared N approved credits. They're ordinary
+  `Catalog.rules.gates` with a new `appliesTo.placeholderKinds` selector + `condition.minCredits`;
+  `evaluateGates` now evaluates slots, but a slot is only matched by `placeholderKinds`/`ids` (never by
+  code regex or semester), so older gates keep their scope. Unmet credit gates read
+  "Se habilita con 75 créditos aprobados (llevas 12 de 75)".
+- **Defaults** for pregrado plans (not maestrías): EFI 75, Electivas 80, CLE + Curso integrador 40.
+  `withCreditUnlockDefaults` adds them wherever rules are read (student payload, admin editor, seed) until
+  `rules.creditUnlocksSeeded` is set — by the seed and by every admin save — so production gets them
+  without a re-seed and an admin's deletion sticks. PLANES.xlsx imports keep the thresholds.
+- **Admin**: Plan → Reglas → "Desbloqueo por créditos" table (slot checkboxes + credits, add/remove);
+  the save route validates the numbers and duplicate ids.
+- **Mi avance panel**: every course and slot has "Marcar como vista" (locked or not); real courses and
+  **CBU slots** can go in the basket. The basket modal lists slots under "Espacios por elegir" (link to the
+  CBU offering, no section picker), includes them in credits / copied list / next steps; the planner
+  suggests one open CBU. Defined the missing `.btnFullRow` footer class.
+- Verified: 167 unit tests pass (new `lib/creditUnlocks.test.ts`), build passes, browser: slots locked at 0 cr
+  with the progress reason, mark-as-seen on a real course, CBU → basket → modal, admin threshold edit
+  (EFI 75 → 3) reflected in the student map, then restored.
+- **Follow-up (same day): thresholds are a UX state, not a lock.** Per the coordinators, the point is to not
+  overwhelm first-semester students, not to enforce a rule. `evaluateGates` now skips slot gates; the new
+  `creditPending()` makes a slot below its threshold read as the ordinary grey "not yet" state — no 🔒, no
+  "Regla administrativa" styling, no "Se habilita con…" text. Still markable as seen. Admin note reworded.
+
+## Session 2026-10-22 (b) — labs in the basket, second language, elective availability, CBU rules
+
+- **Basket labs/complementarias.** `/api/sections` keeps the companions its loose name search already
+  returned (`<code>` + one letter: L laboratorio, C complementaria, P práctica, T taller) and lists them in
+  `companions`; the declared `coreqExternal` codes are requested too (e.g. `IELE3402` → `IELE3403`). The
+  modal adds each companion as its own entry right after its course (own section/NRC, in the week, clash
+  check and NRC list, can't be removed on its own) and shows a notice "N cursos tienen correquisitos
+  obligatorios…" plus a "+ IELE 1218L obligatorio" tag on the course.
+- **Checklist de grado:** new `segundo-idioma` attestation ("Requisito segundo idioma", distinct from the
+  English-reading one) with a "Más información" link (`Attestation.infoUrl`, editable in Reglas). Added to
+  existing plans on read once (`withRuleDefaults`, flag `secondLanguageSeeded`), like the credit thresholds.
+- **Electives — data:** migration `20261022125700_elective_offering_history` (additive): `codeSource,
+  frequency, frequencySource, lastOfferedTerm, registroName, registroCredits, registroPrereqText`. The bag
+  Excel can carry `CÓDIGO` / `SE DICTA` columns; blanks are derived by the seed from the full Registro
+  history (`lib/import/electiveHistory.ts`, see `scripts/exportTemplates.md`). Admin-set codes are kept.
+  `/api/electives/enrich` now also returns this term's prerequisites for offered electives; a known code
+  missing from the offering is "not taught this term" (no more title guessing for it).
+- **Electives — UI:** in Mi avance each row is colour + "Puedes tomarla" or greyscale/striped + 🔒 "Aún no"
+  (prereqs: this term's API, else Registro at the last period taught). Clicking a row answers "¿Qué
+  necesito antes de tomar X?" with the rendered expression, the missing courses (clickable → map) and the
+  source. Non-offered electives show "Última vez dictado en: 2025-1" and the usual semester.
+- **CBU:** side panel and basket state the combination rule (1 CBU de Colombia + 2 CBU libres) with a link
+  to educaciongeneral.uniandes.edu.co/transicion-de-cbu/.
+- Verified: 174 unit tests pass (+ electiveHistory tests), payload-equivalence passes, build passes;
+  browser: Interfaces Hombre-Máquina available vs Automatización Industrial locked (needs IELE 2300) with
+  its "Te falta" panel, IELE 1218 + IELE 1218L in the basket with the notice, checklist shows 4 items,
+  CBU rules box. **Not verified:** live API sections/details (sandbox has no access); prod needs
+  `prisma migrate deploy` (vercel-build does it) **and a seed run** for the elective history columns.

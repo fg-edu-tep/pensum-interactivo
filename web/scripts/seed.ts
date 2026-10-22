@@ -17,6 +17,7 @@ try {
 }
 import { parsePensumWorkbook } from "../lib/import/parsePensumWorkbook";
 import { parsePrereqExport } from "../lib/import/parsePrereqExport";
+import { electiveHistory, nameIndex, parseRegistroHistory } from "../lib/import/electiveHistory";
 import { persistParsedCatalog } from "../lib/import/persistCatalog";
 import { parseElectivesWorkbook } from "../lib/import/parseElectivesWorkbook";
 import { identityForSlug } from "../lib/catalogIdentity";
@@ -119,6 +120,7 @@ async function main() {
         `auto=${res.pairing.auto_paired} not_offered=${res.pairing.not_offered} ` +
         `manual=${res.pairing.needs_manual} pool=${res.pairing.placeholder_pool} ` +
         `sync_failed=${res.pairing.sync_failed} details=${res.detailsPaired}` +
+        (res.requirementGapsFilled > 0 ? ` req_filled=${res.requirementGapsFilled}` : "") +
         (res.apiFailureRate > 0 ? `  (api fail ${(res.apiFailureRate * 100).toFixed(0)}%)` : "")
     );
   }
@@ -139,9 +141,32 @@ async function main() {
     const parsedElectives = parseElectivesWorkbook(
       electiveFiles.map((p) => ({ name: p.split("/").pop() ?? p, buffer: readFileSync(p) }))
     );
+    // fill what the bag leaves blank (code, last period taught, usual
+    // semester, Registro prereqs/credits) from the full Registro history
+    const history = parseRegistroHistory(readFileSync(prereqPath));
+    const index = nameIndex(history);
+    const adminCodes = new Map(
+      (await prisma.elective.findMany({ where: { codeSource: "admin" }, select: { normalizedName: true, code: true } })).map(
+        (x) => [x.normalizedName, x.code] as const
+      )
+    );
     let withTerm = 0;
+    let withCode = 0;
     for (const e of parsedElectives) {
       if (e.offeredTerms.includes(term)) withTerm += 1;
+      const adminCode = adminCodes.get(e.normalizedName) ?? null;
+      const h = electiveHistory({ name: e.name, code: adminCode ?? e.code, frequency: e.frequency }, history, index, term);
+      if (h.code) withCode += 1;
+      const hist = {
+        code: h.code,
+        codeSource: adminCode ? "admin" : h.codeSource,
+        frequency: h.frequency,
+        frequencySource: h.frequencySource,
+        lastOfferedTerm: h.lastOfferedTerm,
+        registroName: h.registroName,
+        registroCredits: h.registroCredits,
+        registroPrereqText: h.registroPrereqText,
+      };
       await prisma.elective.upsert({
         where: { normalizedName: e.normalizedName },
         create: {
@@ -153,6 +178,7 @@ async function main() {
           isCursoIntegrador: e.isCursoIntegrador,
           offeredTerms: e.offeredTerms,
           sourceFiles: e.sourceFiles,
+          ...hist,
         },
         update: {
           name: e.name,
@@ -164,11 +190,12 @@ async function main() {
           ...(resetMeta ? { isCursoIntegrador: e.isCursoIntegrador } : {}),
           offeredTerms: e.offeredTerms,
           sourceFiles: e.sourceFiles,
+          ...hist,
         },
       });
     }
     console.log(
-      `  ✓ ${String(parsedElectives.length).padStart(3)} electives  (${withTerm} ofertadas en ${term})`
+      `  ✓ ${String(parsedElectives.length).padStart(3)} electives  (${withTerm} ofertadas en ${term}, ${withCode} con código)`
     );
   }
 

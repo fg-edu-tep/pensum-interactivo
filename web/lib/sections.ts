@@ -41,6 +41,9 @@ export interface SectionsResponse {
   courses: Record<string, CourseSections>;
   /** codes whose lookup failed (API down / timeout) */
   failed: string[];
+  /** requested code → its companion codes found in the offering (labs "…L",
+   * complementarias "…C", prácticas "…P", talleres "…T") */
+  companions?: Record<string, string[]>;
 }
 
 export const DAY_SHORT = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"] as const;
@@ -94,4 +97,10 @@ export function sectionsConflict(a: SectionInfo, b: SectionInfo): boolean {
     }
   }
   return false;
+}
+
+/** What a companion code is, from its one-letter suffix ("IELE2100L" → laboratorio). */
+export function companionKind(code: string): string {
+  const s = code.slice(-1);
+  return s === "L" ? "Laboratorio" : s === "C" ? "Complementaria" : s === "P" ? "Práctica" : s === "T" ? "Taller" : "Correquisito";
 }

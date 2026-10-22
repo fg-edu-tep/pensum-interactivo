@@ -24,8 +24,10 @@ export interface Restriction {
   desc: string[]; // ["PREGRADO"]
 }
 
-/** Where a course's requirement data came from. */
-export type RequirementSource = "api" | "document" | null;
+/** Where a course's requirement data came from, in priority order (see
+ * lib/requirementResolve.ts): the live API for the plan's term, the plan's
+ * document data, the Registro upload, the API data of another term. */
+export type RequirementSource = "api" | "document" | "registro" | "api-history" | null;
 
 export interface Course {
   id: string;
@@ -54,10 +56,13 @@ export interface Course {
   coreqCourseIds: string[];
   /** coreq codes not in this catalog (labs/practices like "IELE 1118L") */
   coreqExternal: string[];
-  /** "api" when prereq/coreq came from the live courseDetails endpoint,
-   * "document" when from the PRERREQUISITOS spreadsheet, null when neither */
+  /** which source won for prereq/coreq (lib/requirementResolve.ts), null when
+   * no source has data */
   prereqSource?: RequirementSource;
   coreqSource?: RequirementSource;
+  /** the term/period of that source's data, when it has one ("202610") */
+  prereqSourceTerm?: string | null;
+  coreqSourceTerm?: string | null;
   /** title per coreq code, when known from the API ("IELE2002L" → "LAB. …") */
   coreqTitles?: Record<string, string>;
   /** enrollment restrictions (informational, from the API) */
@@ -127,6 +132,13 @@ export interface ElectiveDTO {
   /** counts toward the "Curso Integrador" slot ("ES CURSO INTEGRADOR" in the bag) */
   isCursoIntegrador: boolean;
   offeredTerms: string[];
+  /** usual offering ("SE DICTA" in the bag, else derived from Registro) */
+  frequency?: "s1" | "s2" | "both" | "biennial" | null;
+  /** newest Registro period it was taught in (≤ the seed term) */
+  lastOfferedTerm?: string | null;
+  /** Registro data at that period — the fallback when this term's API has none */
+  registroCredits?: number | null;
+  registroPrereqText?: string | null;
 }
 
 /** Synthetic node for the English-reading graduation requirement (point 5).
@@ -145,6 +157,8 @@ export interface Attestation {
   id: string;
   label: string;
   description?: string;
+  /** "Más información" link shown in the Checklist de grado */
+  infoUrl?: string;
   /** courses whose prereq tree references a code matching this regex are locked
    * until the student checks this attestation (covers "language requirement") */
   autoGatePrereqRegex?: string;
@@ -166,14 +180,22 @@ export interface GateCondition {
 export interface GateRule {
   id: string;
   label: string; // shown on the locked course + in the side panel
-  /** which courses this rule locks */
-  appliesTo: { codeRegex?: string; semesters?: number[]; ids?: string[] };
+  /** which courses this rule locks. `placeholderKinds` selects pensum SLOTS
+   * (EFI, ELECTIVA, CLE, CI, CBU…) for a credit threshold — a soft "not yet"
+   * state, not a lock (lib/creditUnlocks.ts). Slots are only ever matched by it
+   * or by `ids`, never by code regex / semester, so older gates keep their scope. */
+  appliesTo: { codeRegex?: string; semesters?: number[]; ids?: string[]; placeholderKinds?: string[] };
   condition: GateCondition;
 }
 
 export interface CatalogRules {
   gates: GateRule[];
   attestations: Attestation[];
+  /** set once the default credit thresholds (lib/creditUnlocks.ts) were added,
+   * so an admin who removes one doesn't get it back */
+  creditUnlocksSeeded?: boolean;
+  /** set once the "Requisito segundo idioma" attestation was added (same idea) */
+  secondLanguageSeeded?: boolean;
 }
 
 /** A real elective a student has dropped into an elective slot (Mi avance mode). */
