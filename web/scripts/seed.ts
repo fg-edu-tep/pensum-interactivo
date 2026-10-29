@@ -17,7 +17,8 @@ try {
 }
 import { parsePensumWorkbook } from "../lib/import/parsePensumWorkbook";
 import { parsePrereqExport } from "../lib/import/parsePrereqExport";
-import { electiveHistory, nameIndex, parseRegistroHistory } from "../lib/import/electiveHistory";
+import { coverageGaps, electiveHistory, latestRow, nameIndex, parseRegistroHistory } from "../lib/import/electiveHistory";
+import { restrictionToCredits } from "../lib/import/restrictionCredits";
 import { persistParsedCatalog } from "../lib/import/persistCatalog";
 import { parseElectivesWorkbook } from "../lib/import/parseElectivesWorkbook";
 import { identityForSlug } from "../lib/catalogIdentity";
@@ -86,6 +87,9 @@ async function main() {
 
   const catalogs = parsePensumWorkbook(readFileSync(pensumPath));
   const prereqMap = parsePrereqExport(readFileSync(prereqPath), term);
+  // every period of the Registro export: restrictions, last period taught,
+  // electives' codes / frequency (lib/import/electiveHistory.ts)
+  const history = parseRegistroHistory(readFileSync(prereqPath));
   console.log(`\nparsed ${catalogs.length} catalogs, ${prereqMap.size} prereq rows\n`);
 
   const cache = new OfferingsCache();
@@ -125,6 +129,29 @@ async function main() {
     );
   }
 
+  // ---- Registro history → every course: "excluye semestres 1–n" as 15 × n
+  //      approved credits, and the newest period it was taught in ----
+  {
+    const converted: string[] = [];
+    for (const c of await prisma.course.findMany({ select: { id: true, normalizedCode: true, nextOfferingTerm: true } })) {
+      const row = latestRow(history, c.normalizedCode, term);
+      const r = restrictionToCredits(row?.restriction);
+      if (r) converted.push(`${c.normalizedCode} → ${r.minCredits} cr (excluye semestres 1–${r.semesters})`);
+      await prisma.course.update({
+        where: { id: c.id },
+        data: {
+          lastOfferedTerm: row?.period ?? null,
+          minCredits: r?.minCredits ?? null,
+          minCreditsSemesters: r?.semesters ?? null,
+          restrictionText: row?.restriction || null,
+        },
+      });
+    }
+    console.log(`
+restricción → créditos (${converted.length}):`);
+    for (const line of converted) console.log(`  · ${line}`);
+  }
+
   // ---- electives bag (Custom_Pensum/electivas/*.xlsx) ----
   const electivesDir = resolve(seedDir, process.env.ELECTIVAS_DIR ?? "electivas");
   let electiveFiles: string[] = [];
@@ -143,7 +170,6 @@ async function main() {
     );
     // fill what the bag leaves blank (code, last period taught, usual
     // semester, Registro prereqs/credits) from the full Registro history
-    const history = parseRegistroHistory(readFileSync(prereqPath));
     const index = nameIndex(history);
     const adminCodes = new Map(
       (await prisma.elective.findMany({ where: { codeSource: "admin" }, select: { normalizedName: true, code: true } })).map(
@@ -152,11 +178,13 @@ async function main() {
     );
     let withTerm = 0;
     let withCode = 0;
+    const electiveRestrictions: string[] = [];
     for (const e of parsedElectives) {
       if (e.offeredTerms.includes(term)) withTerm += 1;
       const adminCode = adminCodes.get(e.normalizedName) ?? null;
       const h = electiveHistory({ name: e.name, code: adminCode ?? e.code, frequency: e.frequency }, history, index, term);
       if (h.code) withCode += 1;
+      if (h.minCredits) electiveRestrictions.push(`${h.code} ${e.name} → ${h.minCredits} cr`);
       const hist = {
         code: h.code,
         codeSource: adminCode ? "admin" : h.codeSource,
@@ -166,6 +194,8 @@ async function main() {
         registroName: h.registroName,
         registroCredits: h.registroCredits,
         registroPrereqText: h.registroPrereqText,
+        minCredits: h.minCredits,
+        registroLevel: h.registroLevel,
       };
       await prisma.elective.upsert({
         where: { normalizedName: e.normalizedName },
@@ -197,6 +227,19 @@ async function main() {
     console.log(
       `  ✓ ${String(parsedElectives.length).padStart(3)} electives  (${withTerm} ofertadas en ${term}, ${withCode} con código)`
     );
+    console.log(`  restricción → créditos en electivas (${electiveRestrictions.length}):`);
+    for (const line of electiveRestrictions) console.log(`    · ${line}`);
+  }
+
+  // ---- coverage: pensum and elective codes with no Registro row since 2023 ----
+  {
+    const from = process.env.REGISTRO_WINDOW_FROM ?? "202310";
+    const pensum = (await prisma.course.findMany({ where: { catalogCourses: { some: {} } }, select: { normalizedCode: true } })).map((c) => c.normalizedCode);
+    const electives = (await prisma.elective.findMany({ where: { code: { not: null } }, select: { code: true } })).map((e) => e.code!);
+    const gaps = coverageGaps(history, [...pensum, ...electives], from, term);
+    console.log(`
+cobertura del Registro ${from}–${term}: ${gaps.length} código(s) sin fila${gaps.length ? ":" : ""}`);
+    for (const g of gaps) console.log(`  · ${g}`);
   }
 
   console.log("\ndone.");

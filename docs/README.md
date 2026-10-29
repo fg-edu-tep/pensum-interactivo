@@ -10,6 +10,7 @@
 | [`admin-visual-editor-plan.md`](admin-visual-editor-plan.md) | Plan and decision log for Phase B: why visual editing, measured ground truth, design, phases B0–B6 with results, risks |
 | [`2026-10-design-pass.md`](2026-10-design-pass.md) | Engineering log of the October 2026 design pass: what changed, where, why, how to verify, local data actions, open items |
 | [`2026-10-feedback-round.md`](2026-10-feedback-round.md) | Every improvement of the October 2026 feedback round (PR #3), by category, with deploy notes |
+| [`2026-10-29-review.md`](2026-10-29-review.md) | Review with Mauricio (Oct 29): future planning + checkout step 0, slots by requirement, half-box electives, restriction→credits, offering dates, API preflight, Venn rework, portal proposal |
 | [`user-flows.md`](user-flows.md) | The people we design for and the rationale behind each flow (Explorar, Mi avance, basket checkout) |
 | [`../web/components/explorer/DESIGN.md`](../web/components/explorer/DESIGN.md) | CSS / design tokens / component states |
 

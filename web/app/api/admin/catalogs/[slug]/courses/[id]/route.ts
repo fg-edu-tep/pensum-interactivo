@@ -111,8 +111,31 @@ export async function PATCH(
     data.courseId = g.id;
   }
 
+  // next planned offering lives on the global Course (shared by every plan)
+  let offeringChanged = false;
+  if ("nextOfferingTerm" in body) {
+    const t = String(body.nextOfferingTerm ?? "").trim();
+    if (t && !/^\d{4}(10|20|19)$/.test(t)) {
+      return NextResponse.json({ error: "Próxima oferta: usa el formato AAAAPP (p. ej. 202710)." }, { status: 400 });
+    }
+    if (row.courseId != null) {
+      const prev = await prisma.course.findUnique({ where: { id: row.courseId }, select: { nextOfferingTerm: true } });
+      if ((prev?.nextOfferingTerm ?? "") !== t) {
+        await prisma.course.update({ where: { id: row.courseId }, data: { nextOfferingTerm: t || null } });
+        await writeAudit({
+          action: "course.nextOffering",
+          entityType: "Course",
+          entityId: row.courseId,
+          before: { nextOfferingTerm: prev?.nextOfferingTerm ?? null },
+          after: { nextOfferingTerm: t || null },
+        });
+        offeringChanged = true;
+      }
+    }
+  }
+
   if (Object.keys(data).length === 0) {
-    return NextResponse.json({ ok: true, unchanged: true });
+    return NextResponse.json({ ok: true, unchanged: !offeringChanged });
   }
   data.manuallyEdited = true;
 

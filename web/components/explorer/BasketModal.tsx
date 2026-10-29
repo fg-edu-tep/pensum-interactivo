@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Course } from "@/lib/types";
+import type { EnabledBy, StepZero } from "@/lib/planning";
 import {
   companionKind,
   DAY_LONG,
@@ -49,7 +50,12 @@ interface Props {
   planTermCode: string;
   /** course to open expanded (e.g. the one selected when the modal was opened) */
   focusCourseId: string | null;
-  unlockedNextTerm: Course[];
+  /** checkout step 0 for the current cart */
+  zero: StepZero;
+  /** add a same-semester course from step 0 */
+  onAdd: (id: string) => void;
+  /** step 0 was shown for this cart → the map can show its markers */
+  onStepZeroShown: () => void;
   mihorarioUrl: string;
   onClose: () => void;
   onRemove: (id: string) => void;
@@ -57,7 +63,7 @@ interface Props {
 }
 
 type Choice = Record<string, string>; // courseId -> nrc
-type Stage = "review" | "next";
+type Stage = "zero" | "review" | "next";
 type Picked = { course: Course; cs: CourseSections | undefined; section: SectionInfo | null };
 
 const HOUR_PX = 50;
@@ -107,7 +113,9 @@ export default function BasketModal({
   approved,
   planTermCode,
   focusCourseId,
-  unlockedNextTerm,
+  zero,
+  onAdd,
+  onStepZeroShown,
   mihorarioUrl,
   onClose,
   onRemove,
@@ -123,7 +131,11 @@ export default function BasketModal({
   // offering pairs with each course come back as `companions`
   const codesKey = [...new Set(baseItems.flatMap((c) => [c.codeNormalized, ...c.coreqExternal]))].sort().join(",");
 
-  const [stage, setStage] = useState<Stage>("review");
+  // step 0 first: what the finished cart makes available (lib/planning.ts)
+  const [stage, setStage] = useState<Stage>(planned.size > 0 ? "zero" : "review");
+  useEffect(() => {
+    if (stage === "zero") onStepZeroShown();
+  }, [stage, onStepZeroShown]);
   const [data, setData] = useState<SectionsResponse | null>(null);
   const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
   const [choice, setChoice] = useState<Choice>({});
@@ -345,14 +357,18 @@ export default function BasketModal({
           </span>
           <div className={styles.bkHeadText}>
             <h2 id="bk-title" className={styles.bkTitle}>
-              {stage === "next"
+              {stage === "zero"
+                ? "Qué se te habilita"
+                : stage === "next"
                 ? "Qué sigue"
                 : allSet
                   ? `Tu canasta para ${planLabel} está lista`
                   : `Tu canasta · ${planLabel}`}
             </h2>
             <p className={styles.bkSub}>
-              {stage === "next"
+              {stage === "zero"
+                ? `Con lo que aprobaste y tu canasta de ${planLabel} (${planned_.length} curso${planned_.length === 1 ? "" : "s"} · ${credits} créditos)`
+                : stage === "next"
                 ? "Tres pasos para dejar tu horario inscrito"
                 : `${planned_.length} curso${planned_.length === 1 ? "" : "s"} · ${credits} créditos`}
               {stage === "review" && loadState === "ready" && clashes.length > 0 && ` · ${clashes.length} cruce${clashes.length === 1 ? "" : "s"} de horario`}
@@ -362,7 +378,12 @@ export default function BasketModal({
           </div>
           <ol className={styles.bkStepper} aria-label="Pasos">
             <li>
-              <button type="button" className={`${styles.bkStepBtn} ${stage === "review" ? styles.bkStepOn : styles.bkStepDone}`} aria-current={stage === "review" ? "step" : undefined} onClick={() => goStage("review")}>
+              <button type="button" className={`${styles.bkStepBtn} ${stage === "zero" ? styles.bkStepOn : styles.bkStepDone}`} aria-current={stage === "zero" ? "step" : undefined} onClick={() => goStage("zero")} disabled={planned_.length === 0}>
+                <span className={styles.bkStepNum}>{stage !== "zero" ? <CheckIcon size={10} /> : "0"}</span> Qué se te habilita
+              </button>
+            </li>
+            <li>
+              <button type="button" className={`${styles.bkStepBtn} ${stage === "review" ? styles.bkStepOn : stage === "next" ? styles.bkStepDone : ""}`} aria-current={stage === "review" ? "step" : undefined} onClick={() => goStage("review")}>
                 <span className={styles.bkStepNum}>{stage === "next" ? <CheckIcon size={10} /> : "1"}</span> Revisar
               </button>
             </li>
@@ -378,7 +399,9 @@ export default function BasketModal({
         </header>
 
         <div className={styles.bkScroll} ref={scrollRef}>
-          {stage === "review" ? (
+          {stage === "zero" ? (
+            <StepZeroView zero={zero} onAdd={onAdd} />
+          ) : stage === "review" ? (
             <div className={styles.bkReview}>
               {referenceTerm && (
                 <div className={styles.bkNotice} role="note">
@@ -519,7 +542,7 @@ export default function BasketModal({
                                           Elige tu CBU en la oferta <ExternalIcon size={11} />
                                         </a>
                                         <a href={CBU_RULES_URL} target="_blank" rel="noopener noreferrer" className={styles.bkSlotLink}>
-                                          1 de Colombia + 2 libres <ExternalIcon size={11} />
+                                          1 Colombia · 2 de áreas diferentes · 2 libres <ExternalIcon size={11} />
                                         </a>
                                       </>
                                     ) : (
@@ -538,13 +561,6 @@ export default function BasketModal({
                     </>
                   )}
 
-                  {unlockedNextTerm.length > 0 && (
-                    <div className={styles.unlockInsight}>
-                      <span>
-                        Con esta canasta se desbloquean <strong>{unlockedNextTerm.length} curso(s)</strong> para más adelante: {unlockedNextTerm.map((c) => c.code).join(", ")}.
-                      </span>
-                    </div>
-                  )}
                 </>
               )}
             </div>
@@ -566,7 +582,17 @@ export default function BasketModal({
 
         {/* ---------- sticky footer ---------- */}
         <footer className={styles.bkFooter}>
-          {stage === "review" ? (
+          {stage === "zero" ? (
+            <>
+              <span className={styles.bkFootNote}>Puedes volver a este paso cuando quieras.</span>
+              <button type="button" className={styles.btnGhostFooter} onClick={onClose}>
+                Seguir editando
+              </button>
+              <button type="button" className={styles.btnPrimary} onClick={() => goStage("review")}>
+                Continuar: horarios <ArrowRightIcon size={14} />
+              </button>
+            </>
+          ) : stage === "review" ? (
             <>
               <span className={styles.bkFootNote}>
                 {clashes.length > 0
@@ -597,6 +623,73 @@ export default function BasketModal({
           )}
         </footer>
       </div>
+    </div>
+  );
+}
+
+/* ========================================================================== */
+/* Step 0 — what the cart makes available                                      */
+/* ========================================================================== */
+
+function byText(by: EnabledBy, sameSemester: boolean): string {
+  const cart = by.fromCart.map((c) => `${toSentenceCase(c.name)} (${sameSemester ? "correquisito, " : ""}en tu canasta)`);
+  const done = by.fromApproved.map((c) => `${toSentenceCase(c.name)} (aprobada)`);
+  return (sameSemester ? cart : [...done, ...cart]).join(" + ");
+}
+
+function StepZeroView({ zero, onAdd }: { zero: StepZero; onAdd: (id: string) => void }) {
+  const none = zero.sameSemester.length === 0 && zero.nextSemester.length === 0;
+  return (
+    <div className={styles.bkZero}>
+      <p className={styles.bkNextLead}>
+        Así cambia tu mapa con esta canasta. No tienes que hacer nada: revísalo y, si quieres, vuelve a agregar algo.
+      </p>
+      {none && <div className={styles.bkEmpty}><strong>Esta canasta no habilita cursos nuevos todavía.</strong><span>Lo que ya podías ver sigue igual.</span></div>}
+
+      {zero.sameSemester.length > 0 && (
+        <section className={styles.bkZeroBlock}>
+          <h3 className={styles.bkSectionTitle}>Puedes agregarlas este mismo semestre</h3>
+          <p className={styles.bkZeroHint}>Se habilitan por un correquisito que ya está en tu canasta: tu mercado de este semestre creció.</p>
+          <ul className={styles.bkZeroList}>
+            {zero.sameSemester.map(({ course, by }) => (
+              <li key={course.id}>
+                <span className={styles.bkZeroMain}>
+                  <strong>{toSentenceCase(course.name)}</strong>
+                  <span className={styles.bkZeroBy}>
+                    <span className={styles.bkCode}>{course.code}</span> · {course.credits} cr · {byText(by, true)}
+                  </span>
+                </span>
+                <button type="button" className={styles.suggestAddPill} onClick={() => onAdd(course.id)}>
+                  <BasketIcon size={13} /> Agregar
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {zero.nextSemester.length > 0 && (
+        <section className={styles.bkZeroBlock}>
+          <h3 className={styles.bkSectionTitle}>Podrás verlas el próximo semestre</h3>
+          <p className={styles.bkZeroHint}>
+            Lo que aprobaste más tu canasta completa sus requisitos. En el mapa las marcamos con un contorno azul: “La vas a
+            poder ver”.
+          </p>
+          <ul className={styles.bkZeroList}>
+            {zero.nextSemester.map(({ course, by }) => (
+              <li key={course.id}>
+                <span className={styles.bkZeroMain}>
+                  <strong>{toSentenceCase(course.name)}</strong>
+                  <span className={styles.bkZeroBy}>
+                    <span className={styles.bkCode}>{course.code}</span> · {course.credits} cr · {byText(by, false)}
+                  </span>
+                </span>
+                <span className={styles.bkNextTag}>Próximo semestre</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }
@@ -650,7 +743,7 @@ function NextSteps({
           También llevas {slotItems.length === 1 ? "un espacio" : `${slotItems.length} espacios`} por elegir (
           {slotItems.map((c) => c.code).join(", ")}). Escoge el curso en la{" "}
           <a href={CBU_OFERTA_URL} target="_blank" rel="noopener noreferrer">oferta de CBU</a> y agrégalo con su NRC al
-          armar tu horario. Recuerda la combinación: 1 CBU de Colombia y 2 CBU libres (
+          armar tu horario. Recuerda la combinación: 1 CBU Colombia · 2 CBU de áreas diferentes · 2 CBU libres (
           <a href={CBU_RULES_URL} target="_blank" rel="noopener noreferrer">reglas de CBU</a>).
         </div>
       )}

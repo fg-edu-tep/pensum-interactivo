@@ -1,9 +1,10 @@
 "use client";
 
+import type { BoxHalf } from "@/lib/electiveBoxes";
 import { Handle, Position } from "reactflow";
 import type { Course, AvailabilityStatus } from "@/lib/types";
 import { groupOf, groupClass, toSentenceCase, termShort, type CourseGroup } from "./format";
-import { BasketIcon, CheckIcon, LockIcon } from "./icons";
+import { ArrowRightIcon, BasketIcon, CheckIcon, LockIcon } from "./icons";
 import styles from "./explorer.module.css";
 
 export type RelationState =
@@ -28,6 +29,10 @@ export interface CourseCardData {
   reqNumber: number | null; // matches the side-panel requirement row (CARD-07)
   isStaged: boolean;
   isJustUnlocked: boolean;
+  /** next semester per the last checkout step 0 — an outline, never a fill */
+  isNext?: boolean;
+  /** elective box: the course filling each 1-credit half (lib/electiveBoxes.ts) */
+  halves?: [BoxHalf | null, BoxHalf | null] | null;
   isDimmed: boolean;
   onClick: (id: string) => void;
   onHover: (id: string | null, rect?: DOMRect) => void;
@@ -80,6 +85,8 @@ export default function CourseCard({ data }: { data: CourseCardData }) {
     reqNumber,
     isStaged,
     isJustUnlocked,
+    isNext,
+    halves,
     isDimmed,
     onClick,
     onHover,
@@ -95,6 +102,7 @@ export default function CourseCard({ data }: { data: CourseCardData }) {
     relation ? styles[relation] : "",
     isStaged ? styles.staged : "",
     isJustUnlocked ? styles.justUnlocked : "",
+    isNext && status !== "approved" && !isPlanned ? styles.stNext : "",
     isDimmed ? styles.dimmed : "",
     mode === "progress" && status === "approved" ? styles.stApproved : "",
     mode === "progress" && isPlanned ? styles.stPlanned : "",
@@ -118,8 +126,14 @@ export default function CourseCard({ data }: { data: CourseCardData }) {
       onMouseLeave={() => onHover(null)}
       onFocus={(e) => onHover(course.id, e.currentTarget.getBoundingClientRect())}
       onBlur={() => onHover(null)}
-      aria-label={`${course.code} ${title}, ${course.credits} créditos${accessibleState ? `, ${accessibleState}` : ""}`}
-      title={title}
+      aria-label={`${course.code} ${title}, ${course.credits} créditos${accessibleState ? `, ${accessibleState}` : ""}${isNext && status !== "approved" && !isPlanned ? ", la vas a poder ver el próximo semestre" : ""}`}
+      title={
+        halves && (halves[0] || halves[1])
+          ? halvesTooltip(halves)
+          : isNext && status !== "approved" && !isPlanned
+            ? `${title} · La vas a poder ver`
+            : title
+      }
       data-course-id={course.id}
     >
       <Handle type="target" position={Position.Left} style={{ opacity: 0 }} />
@@ -128,6 +142,11 @@ export default function CourseCard({ data }: { data: CourseCardData }) {
         <span className={`${styles.tag}`}>
           <BasketIcon size={10} />
           {termShort(plannedTerm)}
+        </span>
+      )}
+      {isNext && status !== "approved" && !isPlanned && (
+        <span className={styles.nextBadge} aria-hidden>
+          <ArrowRightIcon size={10} />
         </span>
       )}
       {mode === "progress" && status === "approved" && (
@@ -148,8 +167,57 @@ export default function CourseCard({ data }: { data: CourseCardData }) {
         </span>
         <span className={styles.cardCredits}>{course.credits > 0 ? `${course.credits} cr` : "—"}</span>
       </div>
-      <div className={styles.cardTitle}>{title}</div>
+      {halves && (halves[0] || halves[1]) ? <HalvesTitle halves={halves} /> : <div className={styles.cardTitle}>{title}</div>}
       <Handle type="source" position={Position.Right} style={{ opacity: 0 }} />
     </button>
   );
 }
+
+/** "Esta materia vale 4 créditos y ocupa 2 casillas" for every course in the box */
+function halvesTooltip(halves: [BoxHalf | null, BoxHalf | null]): string {
+  const seen = new Set<string>();
+  const parts: string[] = [];
+  for (const h of halves) {
+    if (!h || seen.has(h.key)) continue;
+    seen.add(h.key);
+    const boxes = Math.ceil(h.credits / 2);
+    parts.push(
+      h.credits > 2 || h.cont
+        ? `${toSentenceCase(h.title)}: esta materia vale ${h.credits} créditos y ocupa ${boxes === 1 ? "1 casilla y media" : `${boxes} casillas`}`
+        : `${toSentenceCase(h.title)} (${h.credits} créditos)`
+    );
+  }
+  if (!halves[0] || !halves[1]) parts.push("Medio espacio libre (1 crédito)");
+  return parts.join(" · ");
+}
+
+/** An elective box drawn as two 1-credit halves: one name when one course
+ * fills it, two when it's shared; continuation halves carry "(cont.)". */
+function HalvesTitle({ halves }: { halves: [BoxHalf | null, BoxHalf | null] }) {
+  const [a, b] = halves;
+  if (a && b && a.key === b.key) {
+    return (
+      <div className={styles.cardTitle}>
+        {toSentenceCase(a.title)}
+        {a.cont && <span className={styles.halfCont}> (cont.)</span>}
+      </div>
+    );
+  }
+  return (
+    <div className={styles.halfRows}>
+      {[a, b].map((h, i) => (
+        <span key={i} className={`${styles.halfRow} ${h ? "" : styles.halfEmpty}`}>
+          {h ? (
+            <>
+              {toSentenceCase(h.title)}
+              {h.cont && <span className={styles.halfCont}> (cont.)</span>}
+            </>
+          ) : (
+            "Libre · 1 cr"
+          )}
+        </span>
+      ))}
+    </div>
+  );
+}
+

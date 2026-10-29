@@ -42,10 +42,10 @@ export default function SetupSheet({ courses, approved, onConfirm, onSkip, onBla
     [courses, lastCompleted]
   );
 
-  const toApprove = useMemo(
-    () => priorCourses.filter((c) => !excluded.has(c.id) && !approved.has(c.id)),
-    [priorCourses, excluded, approved]
-  );
+  // the FULL selection (already-approved ones included): confirming replaces
+  // the previous quick selection instead of only adding to it
+  const toApprove = useMemo(() => priorCourses.filter((c) => !excluded.has(c.id)), [priorCourses, excluded]);
+  const newlyMarked = toApprove.filter((c) => !approved.has(c.id)).length;
   const totalCredits = toApprove.reduce((s, c) => s + c.credits, 0);
 
   useEffect(() => {
@@ -121,8 +121,9 @@ export default function SetupSheet({ courses, approved, onConfirm, onSkip, onBla
               <>Empiezas desde cero: <strong>no hay nada que marcar</strong>.</>
             ) : (
               <>
-                Se marcarán <strong>{toApprove.length} curso(s)</strong> ({totalCredits} créditos) de los semestres I–
-                {ROMAN[lastCompleted] || "—"}.
+                Quedarán marcados <strong>{toApprove.length} curso(s)</strong> ({totalCredits} créditos) de los semestres I–
+                {ROMAN[lastCompleted] || "—"}
+                {newlyMarked < toApprove.length ? ` (${newlyMarked} nuevos)` : ""}. Reemplaza tu selección rápida anterior.
               </>
             )}
           </span>
@@ -152,12 +153,12 @@ export default function SetupSheet({ courses, approved, onConfirm, onSkip, onBla
       </div>
       <div className={styles.panelFooter} style={{ flexDirection: "column", gap: 8, alignItems: "stretch" }}>
         {semester === 1 ? (
-          <button className={styles.btnPrimary} onClick={onBlank}>
-            Empezar desde cero
+          <button className={styles.btnPrimary} onClick={() => (firstTime ? onBlank() : onConfirm([]))}>
+            {firstTime ? "Empezar desde cero" : "Aplicar: sin cursos marcados"}
           </button>
         ) : (
-          <button className={styles.btnPrimary} onClick={() => onConfirm(toApprove.map((c) => c.id))} disabled={toApprove.length === 0}>
-            {semester === null ? "Elige un semestre" : `Marcar I–${ROMAN[lastCompleted] || "—"} como aprobados`}
+          <button className={styles.btnPrimary} onClick={() => onConfirm(toApprove.map((c) => c.id))} disabled={semester === null}>
+            {semester === null ? "Elige un semestre" : `Aplicar: marcar I–${ROMAN[lastCompleted] || "—"} como aprobados`}
           </button>
         )}
         <p style={{ fontSize: 11, color: "var(--muted-2)", textAlign: "center", margin: 0 }}>

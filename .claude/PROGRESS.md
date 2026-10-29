@@ -723,3 +723,12 @@ Detailed per-session entries live in `.claude/PROGRESS.md` on `mysql-migration`;
   its "Te falta" panel, IELE 1218 + IELE 1218L in the basket with the notice, checklist shows 4 items,
   CBU rules box. **Not verified:** live API sections/details (sandbox has no access); prod needs
   `prisma migrate deploy` (vercel-build does it) **and a seed run** for the elective history columns.
+
+## Session 2026-10-29 — review with Mauricio (planning, slots by requirement, half-boxes, preflight, Venn)
+
+Full write-up: [`docs/2026-10-29-review.md`](../docs/2026-10-29-review.md). Branch restarted from `main` after PR #3 merged.
+- New pure modules: `lib/planning.ts` (now/next with A, A∪C), `lib/electiveAvailability.ts` (slot rule shared by map + picker), `lib/electiveBoxes.ts` (1-credit halves), `lib/import/restrictionCredits.ts`, `lib/links.ts`.
+- Migrations `20261029135639_course_restrictions_offering_dates`, `20261029141101_elective_level_restriction`; re-seed to fill them.
+- `/api/oferta/health` preflight; `OFERTA_PREFLIGHT=off` for local dev without network (the sandbox has none — without the flag the app shows the outage banner).
+- Gotchas: `pkill -f "next start"` doesn't match the server (process is named `next-server`) — kill by PID. Rebuilding while the server runs serves stale chunks; restart after a build.
+- Open for Mauricio: >8 elective credits rule, next-offering planning file, coverage gaps (IELE2150, IELE3118, IELE3218, IELE3502, MATE1201), classification file.

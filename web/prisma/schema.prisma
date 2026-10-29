@@ -80,6 +80,14 @@ model Course {
   nameEn         String?
   defaultCredits Float?
   createdAt      DateTime @default(now())
+  // --- from the Registro export at seed time (lib/import/restrictionCredits.ts):
+  //     "excluye semestres 1–n" → 15 × n approved credits; the newest period it
+  //     was taught in. nextOfferingTerm is entered by the department (admin). ---
+  minCredits          Int?
+  minCreditsSemesters Int?
+  restrictionText     String?
+  lastOfferedTerm     String?
+  nextOfferingTerm    String?
   // --- catalog description, from the smartcatalogiq scraper (scripts/scrapeDescriptions.ts).
   //     Admin-editable; the seed never touches these. ---
   description        String?
@@ -246,6 +254,12 @@ model Elective {
   registroName       String?
   registroCredits    Float?
   registroPrereqText String?
+  /** Registro's "excluye semestres 1–n" restriction as 15 × n approved credits */
+  minCredits         Int?
+  /** Registro's "Restricción de nivel" at that period ("INCLUYE MAGISTER" …) */
+  registroLevel      String?
+  /** next planned offering (department planning file / admin) */
+  nextOfferingTerm   String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 }

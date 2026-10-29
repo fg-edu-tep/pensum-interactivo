@@ -193,3 +193,58 @@
   font-size: 11.5px;
   color: #6b7280;
 }
+
+/* filters (2026-10-29): combinable toggles with a filter icon */
+.filters { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.filterBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #374151;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.filterBtn[aria-pressed="true"] { background: #1f2430; border-color: #1f2430; color: #ffffff; }
+.filterBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+.filterBtn:focus-visible { outline: 2px solid #1f6fc4; outline-offset: 1px; }
+.note { margin: 0; text-align: center; font-size: 11.5px; color: #92400e; }
+
+/* inline course detail */
+.list li.itemOpen { background: #f8f9fb; }
+.itemBtn {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.itemBtn:hover span { text-decoration: underline; }
+.badgeInt {
+  font-style: normal;
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #3730a3;
+}
+.detail { flex-basis: 100%; padding: 6px 2px 4px; font-size: 12.5px; }
+.detail dl { display: grid; grid-template-columns: max-content 1fr; gap: 3px 10px; margin: 0 0 4px; }
+.detail dt { color: #6b7280; }
+.detail dd { margin: 0; color: #1f2430; }
+.muted { margin: 2px 0; color: #6b7280; font-size: 11.5px; }
+.planLinks { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 4px 0 0; }
+.planLinks a { color: #1f6fc4; font-weight: 600; text-decoration: none; }
+.planLinks a:hover { text-decoration: underline; }

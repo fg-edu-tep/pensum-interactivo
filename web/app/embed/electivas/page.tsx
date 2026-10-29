@@ -12,8 +12,8 @@ import ElectiveVenn from "@/components/embed/ElectiveVenn";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Electivas IELE / IELC / Maestría",
-  description: "Diagrama de Venn de las electivas de Ingeniería Eléctrica, Electrónica y la maestría.",
+  title: "Electivas Eléctrica / Electrónica",
+  description: "Diagrama de Venn de las electivas de Ingeniería Eléctrica y Electrónica.",
 };
 
 export default async function ElectiveVennEmbed({
@@ -24,7 +24,7 @@ export default async function ElectiveVennEmbed({
   const sp = await searchParams;
   const [rows, catalog] = await Promise.all([
     prisma.elective.findMany({
-      select: { id: true, name: true, code: true, level: true, ciclo: true, roles: true, offeredTerms: true },
+      select: { id: true, name: true, code: true, level: true, ciclo: true, roles: true, offeredTerms: true, isCursoIntegrador: true },
     }),
     prisma.catalog.findFirst({ where: { status: "published" }, orderBy: { term: "desc" }, select: { term: true } }),
   ]);
@@ -38,5 +38,10 @@ export default async function ElectiveVennEmbed({
     }))
   );
 
-  return <ElectiveVenn electives={electives} term={term} initialOnlyOffered={sp.oferta === "1"} />;
+  // "Planear con esta materia" opens the standard plan of the program
+  const plans = await prisma.catalog.findMany({ where: { status: "published" }, select: { slug: true } });
+  const has = (slug: string) => plans.some((p) => p.slug === slug);
+  const planSlugs = { ele: has("iele-cbu3") ? "iele-cbu3" : null, elc: has("ielc-cbu3") ? "ielc-cbu3" : null };
+
+  return <ElectiveVenn electives={electives} term={term} initialOnlyOffered={sp.oferta === "1"} planSlugs={planSlugs} />;
 }

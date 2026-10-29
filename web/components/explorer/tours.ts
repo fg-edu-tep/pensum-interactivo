@@ -49,7 +49,7 @@ export function exploreSteps(anchorId: string | null): TourStepDef[] {
       target: '[data-tour="reltoggle"]',
       marker: "Qué mostrar",
       title: "Tres preguntas, una a la vez",
-      body: "«Qué necesito» responde ¿qué debo aprobar antes de inscribirlo? «Qué desbloquea» responde ¿qué se me abre con solo aprobarlo? — cursos donde este es el único requisito que falta. «Qué depende de él» responde ¿qué cursos lo piden, aunque pidan otros más? Lo que desbloquea siempre depende de él; lo que depende no siempre se desbloquea.",
+      body: "«Qué necesito» responde ¿qué debo aprobar antes de inscribirlo? «Qué se me habilita» responde ¿qué podré ver si apruebo o inscribo este curso?, según tu avance: lo que se abre este mismo semestre (por correquisito) o el próximo. «Qué depende de él» responde ¿qué cursos lo piden, aunque pidan otros más?",
     },
     {
       id: "relaciones",
@@ -70,7 +70,7 @@ export function exploreSteps(anchorId: string | null): TourStepDef[] {
       target: '[data-tour="panel"]',
       marker: "Panel del curso",
       title: "El panel del curso",
-      body: "Reúne la ruta resumida (necesitas → este curso → desbloquea), si se dicta este periodo, los requisitos numerados, de dónde salen y la descripción. Cada código del panel lleva a ese curso.",
+      body: "Reúne la ruta resumida (necesitas → este curso → lo que lo pide), si se dicta este periodo, los requisitos numerados, de dónde salen y la descripción. Cada código del panel lleva a ese curso.",
     },
     {
       id: "search",
@@ -109,8 +109,8 @@ export function avanceSteps(): TourStepDef[] {
       id: "reltoggle",
       target: '[data-tour="reltoggle"]',
       marker: "Qué mostrar",
-      title: "Qué necesito, qué desbloquea, qué depende",
-      body: "Con un curso seleccionado, este selector responde una pregunta a la vez. «Qué necesito»: ¿qué debo aprobar antes? «Qué desbloquea»: ¿qué se me abre con solo aprobarlo o tenerlo en mi canasta? «Qué depende de él»: ¿qué cursos lo piden, aunque pidan otros más?",
+      title: "Qué necesito, qué se me habilita, qué depende",
+      body: "Con un curso seleccionado, este selector responde una pregunta a la vez. «Qué necesito»: ¿qué debo aprobar antes? «Qué se me habilita»: ¿qué podré ver si apruebo o inscribo este curso? — este mismo semestre o el próximo. «Qué depende de él»: ¿qué cursos lo piden, aunque pidan otros más?",
     },
     {
       id: "legend",
@@ -131,7 +131,7 @@ export function avanceSteps(): TourStepDef[] {
       target: '[data-tour="cart"]',
       marker: "Tu canasta",
       title: "La canasta del próximo semestre",
-      body: "Aquí se arma el plan del próximo semestre, con «Agregar» o desde el panel de cada curso. Solo entran cursos cuyos prerrequisitos ya cumples (vistos + los de la canasta), y abajo aparece lo que eso te desbloquea.",
+      body: "Aquí se arma el plan del próximo semestre, con «Agregar» o desde el panel de cada curso (si te falta un requisito, te avisamos; puedes agregarlo igual por homologaciones). Al revisar la canasta, el primer paso te muestra qué se te habilita este semestre y el próximo.",
     },
     {
       id: "suggest",

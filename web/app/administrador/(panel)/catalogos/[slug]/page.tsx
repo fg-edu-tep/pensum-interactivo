@@ -25,6 +25,9 @@ export default async function CatalogEditorPage({
               normalizedCode: true,
               description: true,
               descriptionSyncedAt: true,
+              lastOfferedTerm: true,
+              nextOfferingTerm: true,
+              minCredits: true,
             },
           },
         },
@@ -85,6 +88,9 @@ export default async function CatalogEditorPage({
         ? c.course.descriptionSyncedAt.toISOString()
         : null,
       discrepancy: discById.get(c.id) ?? null,
+      lastOfferedTerm: c.course?.lastOfferedTerm ?? null,
+      nextOfferingTerm: c.course?.nextOfferingTerm ?? "",
+      minCredits: c.course?.minCredits ?? null,
     })),
     requirementNodes: catalog.requirementNodes.map((n) => ({
       id: n.id,

@@ -5,15 +5,15 @@ import { parseFrequency } from "./parseElectivesWorkbook";
 
 const w = significantWords;
 const history: RegistroHistory = new Map([
-  ["IELE3135", [{ period: "202520", name: "AUTOMAT SISTEMAS DISTRIBUCIÓN", credits: 3, prereqText: "IELE 2100" }]],
-  ["IELE4311", [{ period: "202620", name: "SISTEMAS NO LINEALES", credits: 4, prereqText: "" }]],
+  ["IELE3135", [{ period: "202520", name: "AUTOMAT SISTEMAS DISTRIBUCIÓN", credits: 3, prereqText: "IELE 2100", restriction: "", level: "" }]],
+  ["IELE4311", [{ period: "202620", name: "SISTEMAS NO LINEALES", credits: 4, prereqText: "", restriction: "", level: "" }]],
   ["IELE3720", [
-    { period: "202620", name: "INTERFACES HOMBRE-MÁQUINA", credits: 3, prereqText: "ISIS 1221" },
-    { period: "202520", name: "INTERFACES HOMBRE-MÁQUINA", credits: 3, prereqText: "ISIS 1221" },
+    { period: "202620", name: "INTERFACES HOMBRE-MÁQUINA", credits: 3, prereqText: "ISIS 1221", restriction: "", level: "" },
+    { period: "202520", name: "INTERFACES HOMBRE-MÁQUINA", credits: 3, prereqText: "ISIS 1221", restriction: "", level: "" },
   ]],
   ["IELE3206", [
-    { period: "202610", name: "INSTRUMENTACIÓN ELECTRÓNICA", credits: 2, prereqText: "IELE 2206" },
-    { period: "202510", name: "INSTRUMENTACIÓN ELECTRÓNICA", credits: 2, prereqText: "IELE 2206" },
+    { period: "202610", name: "INSTRUMENTACIÓN ELECTRÓNICA", credits: 2, prereqText: "IELE 2206", restriction: "", level: "" },
+    { period: "202510", name: "INSTRUMENTACIÓN ELECTRÓNICA", credits: 2, prereqText: "IELE 2206", restriction: "", level: "" },
   ]],
 ]);
 const idx = nameIndex(history);

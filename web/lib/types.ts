@@ -67,6 +67,15 @@ export interface Course {
   coreqTitles?: Record<string, string>;
   /** enrollment restrictions (informational, from the API) */
   restrictions?: Restriction[];
+  /** approved credits required before taking it: Registro's "excluye
+   * semestres 1–n" restriction read as 15 × n credits (lib/restrictionCredits.ts) */
+  minCredits?: number | null;
+  /** the excluded-semester count behind `minCredits` (for "equivale a n semestres") */
+  minCreditsSemesters?: number | null;
+  /** newest Registro period it was taught in (≤ the plan's term) */
+  lastOfferedTerm?: string | null;
+  /** next planned offering, from the department's planning file / admin */
+  nextOfferingTerm?: string | null;
   /** for a RequirementNode-backed slot: which attestation flips its "cumplido"
    * state, plus its editable info text/link (all from the DB row) */
   requirementAttestationId?: string | null;
@@ -139,6 +148,12 @@ export interface ElectiveDTO {
   /** Registro data at that period — the fallback when this term's API has none */
   registroCredits?: number | null;
   registroPrereqText?: string | null;
+  /** Registro's "excluye semestres 1–n" restriction as 15 × n approved credits */
+  minCredits?: number | null;
+  /** next planned offering (department planning file / admin) */
+  nextOfferingTerm?: string | null;
+  /** Registro's "Restricción de nivel" ("INCLUYE MAGISTER" = master's only) */
+  registroLevel?: string | null;
 }
 
 /** Synthetic node for the English-reading graduation requirement (point 5).
@@ -194,6 +209,8 @@ export interface CatalogRules {
   /** set once the default credit thresholds (lib/creditUnlocks.ts) were added,
    * so an admin who removes one doesn't get it back */
   creditUnlocksSeeded?: boolean;
+  /** set once the 2026-10-22 credit-threshold defaults were removed */
+  creditUnlocksRetired?: boolean;
   /** set once the "Requisito segundo idioma" attestation was added (same idea) */
   secondLanguageSeeded?: boolean;
 }
@@ -207,6 +224,11 @@ export interface ElectiveAssignment {
   sectionCount?: number;
   /** id of the ElectiveDTO chosen from the bag (for re-highlighting the row) */
   electiveId?: number;
+  /** half-box electives (lib/electiveBoxes.ts): the 1-credit halves it fills,
+   * "<boxId>#0|1", in order; absent for non-box slots (EFI, CI…) */
+  halves?: string[];
+  /** credits that didn't fit in the remaining elective boxes */
+  overflow?: number;
 }
 
 /** The denormalized document the student panel consumes for one catalog. */
