@@ -15,6 +15,8 @@ export interface EditorElective {
   ciclo: string;
   isCursoIntegrador: boolean;
   offeredTerms: string;
+  /** next planned offering, YYYYPP (department planning file / admin) */
+  nextOfferingTerm: string;
   roles: {
     eleFrom2024: RoleCell;
     elcFrom2024: RoleCell;
@@ -124,6 +126,7 @@ function ElectiveRow({ elective }: { elective: EditorElective }) {
     ciclo: elective.ciclo,
     isCursoIntegrador: elective.isCursoIntegrador,
     offeredTerms: elective.offeredTerms,
+    nextOfferingTerm: elective.nextOfferingTerm,
     roles: JSON.parse(JSON.stringify(elective.roles)) as EditorElective["roles"],
   });
   const [busy, setBusy] = useState<string | null>(null);
@@ -136,6 +139,7 @@ function ElectiveRow({ elective }: { elective: EditorElective }) {
     ciclo: elective.ciclo,
     isCursoIntegrador: elective.isCursoIntegrador,
     offeredTerms: elective.offeredTerms,
+    nextOfferingTerm: elective.nextOfferingTerm,
     roles: elective.roles,
   });
 
@@ -250,6 +254,15 @@ function ElectiveRow({ elective }: { elective: EditorElective }) {
             onChange={(e) => setF({ ...f, code: e.target.value })}
           />
         </div>
+        <div>
+          <label>Próxima oferta planeada (AAAAPP)</label>
+          <input
+            className="admin-input"
+            placeholder="p. ej. 202710"
+            value={f.nextOfferingTerm}
+            onChange={(e) => setF({ ...f, nextOfferingTerm: e.target.value })}
+          />
+        </div>
       </div>
       <div className="er-actions" style={{ padding: "8px 12px" }}>
         <button
@@ -270,6 +283,7 @@ function ElectiveRow({ elective }: { elective: EditorElective }) {
                 ciclo: elective.ciclo,
                 isCursoIntegrador: elective.isCursoIntegrador,
                 offeredTerms: elective.offeredTerms,
+                nextOfferingTerm: elective.nextOfferingTerm,
                 roles: JSON.parse(JSON.stringify(elective.roles)),
               })
             }

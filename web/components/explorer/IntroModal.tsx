@@ -10,7 +10,7 @@ import styles from "./explorer.module.css";
 
 const WHAT_WE_SHOW = [
   { title: "Dónde se marca lo que ya viste", body: "Por semestre o curso por curso, y siempre se puede corregir." },
-  { title: "Cómo leer el mapa", body: "Qué significa cada color y qué necesita, desbloquea o depende de cada curso." },
+  { title: "Cómo leer el mapa", body: "Qué significa cada color y qué necesita cada curso, qué se te habilita y qué depende de él." },
   { title: "Cómo armar tu próximo semestre", body: "La canasta: qué ya puedes inscribir y qué te abre." },
 ];
 

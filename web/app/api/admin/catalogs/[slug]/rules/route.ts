@@ -81,7 +81,7 @@ export async function PATCH(
 
   // saving marks the plan as past the default credit thresholds: what the
   // admin left (deletions included) is what students get
-  const rules = { gates, attestations, creditUnlocksSeeded: true, secondLanguageSeeded: true } as unknown as Prisma.InputJsonValue;
+  const rules = { gates, attestations, creditUnlocksSeeded: true, creditUnlocksRetired: true, secondLanguageSeeded: true } as unknown as Prisma.InputJsonValue;
   await prisma.catalog.update({ where: { slug }, data: { rules } });
   await writeAudit({
     action: "catalog.rules.update",

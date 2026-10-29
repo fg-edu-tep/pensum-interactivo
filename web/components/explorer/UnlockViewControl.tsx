@@ -2,12 +2,14 @@
 
 // What the map shows around the SELECTED course — ONE view at a time (a
 // segmented toggle, not checkboxes), each phrased as the question it answers:
-//   Qué necesito      — ¿qué debo aprobar antes de inscribirlo?      [default]
-//   Qué desbloquea    — ¿qué se me abre con solo aprobarlo?  (it is the ONLY
-//                       prerequisite left of those courses)
-//   Qué depende de él — ¿qué cursos lo piden, aunque pidan otros más?
-// "Desbloquea" ⊂ "Depende": every course it unlocks depends on it, but a course
-// that also asks for something else only depends on it.
+//   Qué necesito       — ¿qué debo aprobar antes de inscribirlo?      [default]
+//   Qué se me habilita — ¿qué podré ver si apruebo o inscribo este curso?
+//                        lib/planning.ts wouldEnable: with this course added to
+//                        approved ∪ cart, which courses become available — this
+//                        same semester (by corequisite) or the next one. Depends
+//                        on the student's progress. (Was "Qué desbloquea".)
+//   Qué depende de él  — ¿qué cursos lo piden, aunque pidan otros más?
+//                        (every course with this one as a requirement, at any depth)
 
 import styles from "./explorer.module.css";
 
@@ -68,9 +70,9 @@ export const REL_OPTIONS: { key: RelKey; label: string; question: string; hint: 
   },
   {
     key: "unlocks",
-    label: "Qué desbloquea",
-    question: "¿Qué se me abre con solo aprobar este curso (o tenerlo en mi canasta)?",
-    hint: "Los cursos para los que este es el único requisito que falta: al aprobarlo quedan disponibles.",
+    label: "Qué se me habilita",
+    question: "¿Qué podré ver si apruebo o inscribo este curso?",
+    hint: "Con tu avance actual: los cursos que quedan disponibles este mismo semestre (por correquisito) o el próximo, si apruebas o inscribes este curso.",
   },
   {
     key: "depends",

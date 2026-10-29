@@ -12,6 +12,7 @@ export default async function ElectivasPage() {
     id: e.id,
     name: e.name,
     code: e.code ?? "",
+    nextOfferingTerm: e.nextOfferingTerm ?? "",
     level: e.level,
     ciclo: e.ciclo ?? "",
     isCursoIntegrador: e.isCursoIntegrador,
@@ -41,7 +42,7 @@ export default async function ElectivasPage() {
 
       <details className="admin-section" style={{ marginTop: 28 }}>
         <summary style={{ cursor: "pointer", fontWeight: 600 }}>
-          Diagrama de Venn para incrustar (Eléctrica · Electrónica · Maestría)
+          Diagrama de Venn para incrustar (Eléctrica · Electrónica)
         </summary>
         <p className="admin-note">
           Página pública e incrustable en otros sitios. Se arma con esta bolsa: rol 2024-I+ de cada programa

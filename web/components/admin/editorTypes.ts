@@ -31,6 +31,12 @@ export interface EditorCourse {
   lockedFields: string[];
   description: string;
   descriptionSyncedAt: string | null;
+  /** global Course: newest Registro period taught (read-only) and the next
+   * planned offering (editable, YYYYPP) */
+  lastOfferedTerm: string | null;
+  nextOfferingTerm: string;
+  /** "excluye semestres 1–n" read as credits, from the seed (read-only) */
+  minCredits: number | null;
   /** document-vs-API report for this row (null for rows without a real course) */
   discrepancy: { prereq: FieldAlertData; coreq: FieldAlertData } | null;
 }

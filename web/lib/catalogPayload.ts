@@ -160,6 +160,10 @@ export async function buildCatalogPayload(slug: string): Promise<CatalogPayload 
       coreqSourceTerm: co.sourceTerm,
       coreqTitles,
       restrictions,
+      minCredits: cc.isPlaceholder ? null : (cc.course?.minCredits ?? null),
+      minCreditsSemesters: cc.isPlaceholder ? null : (cc.course?.minCreditsSemesters ?? null),
+      lastOfferedTerm: cc.course?.lastOfferedTerm ?? null,
+      nextOfferingTerm: cc.course?.nextOfferingTerm ?? null,
     };
   });
 
@@ -262,6 +266,9 @@ export async function buildCatalogPayload(slug: string): Promise<CatalogPayload 
     lastOfferedTerm: e.lastOfferedTerm,
     registroCredits: e.registroCredits,
     registroPrereqText: e.registroPrereqText,
+    minCredits: e.minCredits,
+    nextOfferingTerm: e.nextOfferingTerm,
+    registroLevel: e.registroLevel,
   }));
 
   return {

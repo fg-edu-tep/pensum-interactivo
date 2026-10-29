@@ -11,7 +11,8 @@ import type {
 } from "@/lib/types";
 import { foldAccents } from "@/lib/import/textMatch";
 import { parseRequirement } from "@/lib/import/requirementParser";
-import { missingCodes, satisfied } from "@/lib/availability";
+import { missingCodes } from "@/lib/availability";
+import { electiveState, graduateOnly, narrowFromSlot, requiredCourseCodes, slotCatalog } from "@/lib/electiveAvailability";
 import { renderRequirement } from "@/lib/requirementText";
 import { LockIcon } from "./icons";
 
@@ -33,6 +34,10 @@ interface Props {
   approved: Set<string>;
   catalogCodes: Set<string>;
   onSelectCourse: (id: string) => void;
+  /** the cart ("*" prerequisites in it count) and credits(A) — same rule as the slot */
+  cart: Set<string>;
+  approvedCredits: number;
+  slot: Course;
 }
 
 const FREQUENCY_LABEL: Record<NonNullable<ElectiveDTO["frequency"]>, string> = {
@@ -94,13 +99,6 @@ function toTitle(s: string): string {
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
 
-function narrowFromSlot(slotLabel: string): string | null {
-  const s = foldAccents(slotLabel);
-  if (s.includes("AREA MAYOR")) return "area_mayor";
-  if (s.includes("INTEGRADOR")) return "curso_integrador";
-  if (s.includes("LIBRE") || s.includes("CLE")) return "cle";
-  return null;
-}
 
 export default function ElectivePicker({
   electives,
@@ -117,6 +115,9 @@ export default function ElectivePicker({
   approved,
   catalogCodes,
   onSelectCourse,
+  cart,
+  approvedCredits,
+  slot,
 }: Props) {
   const [openId, setOpenId] = useState<number | null>(null);
   const byCode = useMemo(() => new Map(allCourses.map((c) => [c.codeNormalized, c])), [allCourses]);
@@ -133,6 +134,11 @@ export default function ElectivePicker({
     () => (integradorOnly ? null : narrowFromSlot(slotLabel)),
     [slotLabel, integradorOnly]
   );
+  // the slot's catalog and each elective's state come from
+  // lib/electiveAvailability.ts — the slot is enabled iff one of these is "now"
+  const catalog = useMemo(() => slotCatalog(electives, programCode, slot), [electives, programCode, slot]);
+  const pregrado = !/^M/i.test(programCode);
+  const eCtx = useMemo(() => ({ approved, cart, catalogCodes, approvedCredits, pregrado }), [approved, cart, catalogCodes, approvedCredits, pregrado]);
   const tShort = termShort(term);
 
   useEffect(() => {
@@ -196,24 +202,10 @@ export default function ElectivePicker({
   }
 
 
-  const rolesFor = (e: ElectiveDTO): RoleCell[] => {
-    const ele = e.roles.eleFrom2024;
-    const elc = e.roles.elcFrom2024;
-    if (programCode === "IELC") return [elc];
-    if (programCode === "DOBLE") return [ele, elc];
-    return [ele];
-  };
 
   const filtered = useMemo(() => {
     const needle = foldAccents(q).trim();
-    return electives.filter((e) => {
-      if (integradorOnly) {
-        if (!e.isCursoIntegrador) return false;
-      } else {
-        const cells = rolesFor(e).filter((c) => c && c.norm);
-        if (cells.length === 0) return false;
-        if (wantRole && !cells.some((c) => c.norm === wantRole)) return false;
-      }
+    return catalog.filter((e) => {
       // "offered this term": the Excel's curated list, or a live-offering match
       if (onlyThisTerm && !e.offeredTerms.includes(term) && !enrichment?.matches[e.id]) return false;
       if (needle) {
@@ -223,7 +215,7 @@ export default function ElectivePicker({
       return true;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [electives, onlyThisTerm, q, wantRole, term, programCode, integradorOnly, enrichment]);
+  }, [catalog, onlyThisTerm, q, term, enrichment]);
 
   const roleChips = (e: ElectiveDTO) => {
     const ele = e.roles.eleFrom2024;
@@ -270,6 +262,17 @@ export default function ElectivePicker({
             {assignment.sectionCount ? ` · ${assignment.sectionCount} secc.` : ""}
             {!assignment.code ? " · créditos por confirmar" : ""}
           </div>
+          {assignment.halves && assignment.halves.length > 2 && (
+            <div className="elective-assigned-meta">
+              Vale {assignment.credits} créditos: ocupa {assignment.halves.length % 2 ? `${Math.floor(assignment.halves.length / 2)} casilla${assignment.halves.length > 3 ? "s" : ""} y media` : `${assignment.halves.length / 2} casillas`} de
+              electivas (marcadas “cont.” en el mapa).
+            </div>
+          )}
+          {!!assignment.overflow && (
+            <div className="elective-overflow">
+              +{assignment.overflow} cr por encima de los créditos de electivas del plan.
+            </div>
+          )}
           <button
             type="button"
             className="elective-remove"
@@ -322,12 +325,15 @@ export default function ElectivePicker({
             const live = enrichment?.matches[e.id];
             const offeredNow = e.offeredTerms.includes(term) || !!live;
             const req = requirementOf(e, live);
-            const code = live?.code ?? e.code;
             // Mi avance: can it be taken now? (seen > available > locked)
-            const seen = !!code && approved.has(code);
-            const ok = satisfied(req.tree, approved, catalogCodes);
-            const locked = canPick && !seen && !ok;
-            const missing = locked ? [...missingCodes(req.tree, approved, catalogCodes)] : [];
+            const st = electiveState(e, eCtx, live?.prereqText, live?.code);
+            const seen = st === "seen";
+            const locked = canPick && st === "blocked";
+            const unknown = st === "unknown";
+            const gradOnly = pregrado && graduateOnly(e.registroLevel);
+            const together = new Set([...approved, ...cart]);
+            const missing = locked ? [...missingCodes(req.tree, approved, requiredCourseCodes(req.tree), (c) => together.has(c))] : [];
+            const creditsShort = typeof e.minCredits === "number" ? Math.max(0, e.minCredits - approvedCredits) : 0;
             const open = openId === e.id;
             const lastLabel = !offeredNow && e.lastOfferedTerm ? termShort(e.lastOfferedTerm) : null;
             return (
@@ -350,15 +356,16 @@ export default function ElectivePicker({
                   )}
                   <span className="elective-name">{e.name}</span>
                   {canPick && (
-                    <span className={`elective-state${locked ? " is-locked" : ""}`}>
-                      {seen ? "Vista" : locked ? "Aún no" : "Puedes tomarla"}
+                    <span className={`elective-state${locked ? " is-locked" : ""}${unknown ? " is-unknown" : ""}`}>
+                      {seen ? "Vista" : locked ? "Aún no" : unknown ? "Verifica prerrequisitos" : "Puedes tomarla"}
                     </span>
                   )}
                   {offeredNow && <span className="chip ptrm">{tShort}</span>}
                 </button>
-                {(lastLabel || e.frequency) && (
+                {(lastLabel || e.frequency || e.nextOfferingTerm) && (
                   <div className="elective-when">
                     {lastLabel && <span>Última vez dictado en: {lastLabel}</span>}
+                    {e.nextOfferingTerm && <span>Próxima oferta planeada: {termShort(e.nextOfferingTerm)}</span>}
                     {e.frequency && <span>{FREQUENCY_LABEL[e.frequency]}</span>}
                   </div>
                 )}
@@ -366,6 +373,17 @@ export default function ElectivePicker({
                   <div className="elective-req" id={`el-req-${e.id}`}>
                     <strong>¿Qué necesito antes de tomar {toTitle(e.name)}?</strong>
                     <p>{req.tree ? renderRequirement(req.tree, allCourses) : "No tiene prerrequisitos registrados."}</p>
+                    {gradOnly && <p className="elective-credits">Según Registro, solo para estudiantes de posgrado (maestría / doctorado).</p>}
+                    {unknown && (
+                      <p className="elective-src">
+                        Aún no tenemos su código ni sus requisitos en los datos del programa: verifica sus prerrequisitos en la oferta de cursos.
+                      </p>
+                    )}
+                    {locked && creditsShort > 0 && (
+                      <p className="elective-credits">
+                        Te faltan {creditsShort} créditos aprobados: pide {e.minCredits} (equivale a {Math.round((e.minCredits ?? 0) / 15)} semestres).
+                      </p>
+                    )}
                     {missing.length > 0 && (
                       <div className="elective-missing">
                         <span>Te falta:</span>

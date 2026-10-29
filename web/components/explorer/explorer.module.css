@@ -2968,3 +2968,83 @@
 .cbuRules ul { margin: 0 0 6px; padding-left: 18px; }
 .cbuRules a { color: var(--accent); font-weight: 600; text-decoration: none; }
 .cbuRules a:hover { text-decoration: underline; }
+
+/* "Ojo: no has aprobado …" — adding to the cart without the requirements is allowed */
+.planWarn {
+  flex: 1 0 100%;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--st-warn) 10%, white);
+  border: 1px solid color-mix(in srgb, var(--st-warn) 30%, white);
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+.planWarn strong { color: var(--st-warn); }
+
+/* ---- checkout step 0: qué se te habilita ---- */
+.bkZero { padding: 22px 26px 30px; max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+.bkZeroBlock { display: flex; flex-direction: column; gap: 8px; }
+.bkZeroHint { margin: 0; font-size: 13px; color: var(--muted); }
+.bkZeroList { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); overflow: hidden; }
+.bkZeroList li { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--line-soft); }
+.bkZeroList li:first-child { border-top: none; }
+.bkZeroMain { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
+.bkZeroBy { font-size: 12.5px; color: var(--ink-2); }
+.bkNextTag {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1.5px solid var(--st-plan);
+  color: var(--st-plan);
+  background: var(--surface);
+}
+.basketZeroHint { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
+
+/* "La vas a poder ver" (checkout step 0, next semester): blue OUTLINE + badge.
+   Never a fill — fill means approved. */
+.card.stNext { box-shadow: 0 0 0 2px var(--ring-gap), 0 0 0 4px var(--st-plan); }
+.nextBadge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--ring-gap);
+  color: var(--st-plan);
+  border: 2px solid var(--st-plan);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* half-box electives: a box shared by two courses shows one line per half */
+.halfRows { display: flex; flex-direction: column; gap: 1px; }
+.halfRow {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-left: 5px;
+  border-left: 2px solid color-mix(in srgb, currentColor 45%, transparent);
+}
+.halfRow + .halfRow { border-left-style: dashed; }
+.halfEmpty { opacity: 0.6; font-weight: 500; font-style: italic; }
+.halfCont { font-weight: 500; opacity: 0.8; }
+
+/* API preflight failed: planning disabled, explorer read-only */
+.ofertaDown {
+  padding: 10px 20px;
+  background: #fef3c7;
+  border-bottom: 1px solid #f59e0b;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #78350f;
+}
+.ofertaDown a { color: #92400e; font-weight: 700; }

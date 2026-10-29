@@ -6,6 +6,8 @@ import { ArrowRightIcon, BasketIcon, ShareIcon } from "./icons";
 import styles from "./explorer.module.css";
 
 interface Props {
+  /** the course API is down: no adding, no checkout */
+  planningBlocked?: boolean;
   courses: Course[];
   approved: Set<string>;
   planned: Map<string, string>; // courseId -> term
@@ -13,7 +15,6 @@ interface Props {
   term: string;
   creditsDone: number;
   creditsTotal: number;
-  unlockedNextTerm: Course[];
   mihorarioUrl: string;
   onTogglePlanned: (id: string, term: string | null) => void;
   onOpenBasket: () => void;
@@ -29,12 +30,12 @@ export default function PlannerPanel({
   term,
   creditsDone,
   creditsTotal,
-  unlockedNextTerm,
   mihorarioUrl,
   onTogglePlanned,
   onOpenBasket,
   onSelectCourse,
   onShare,
+  planningBlocked = false,
 }: Props) {
   const plannedCourses = courses.filter((c) => planned.has(c.id));
   const plannedCredits = plannedCourses.reduce((s, c) => s + c.credits, 0);
@@ -103,13 +104,12 @@ export default function PlannerPanel({
             ))
           )}
 
-          {unlockedNextTerm.length > 0 && (
-            <div className={styles.unlockInsight}>
-              <span>
-                Con esta canasta se desbloquean <strong>{unlockedNextTerm.length} curso(s)</strong> para más
-                adelante: {unlockedNextTerm.map((c) => c.code).join(", ")}.
-              </span>
-            </div>
+          {/* what the cart opens is shown once, at checkout step 0 — not on
+              every add, so one addition doesn't chain into the next */}
+          {plannedCourses.length > 0 && (
+            <p className={styles.basketZeroHint}>
+              Cuando termines, “Revisar mi canasta” te muestra qué se te habilita este semestre y el próximo.
+            </p>
           )}
         </div>
 
@@ -121,7 +121,7 @@ export default function PlannerPanel({
                 <span className={styles.plannedRowCode} style={{ width: "auto", marginRight: 8 }}>{c.code}</span>
                 {toSentenceCase(c.name)}
               </button>
-              <button className={styles.suggestAddPill} onClick={() => onTogglePlanned(c.id, nextTermCode())} aria-label="Agregar a la canasta">
+              <button className={styles.suggestAddPill} disabled={planningBlocked} onClick={() => onTogglePlanned(c.id, nextTermCode())} aria-label="Agregar a la canasta">
                 <BasketIcon size={13} /> Agregar
               </button>
             </div>
@@ -133,7 +133,7 @@ export default function PlannerPanel({
         {plannedCourses.length > 0 ? (
           // once there's something in the basket, the next step is to review
           // and confirm it (sections, teachers, week) — the checkout modal
-          <button type="button" className={styles.btnPrimary} onClick={onOpenBasket}>
+          <button type="button" className={styles.btnPrimary} onClick={onOpenBasket} disabled={planningBlocked}>
             Revisar mi canasta · {plannedCredits} cr <ArrowRightIcon size={14} />
           </button>
         ) : (
