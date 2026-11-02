@@ -19,6 +19,7 @@
 import type { CatalogRules, Course } from "./types";
 import { creditPending, evaluateGates, missingCodes, satisfied } from "./availability";
 import { collectCourseCodes } from "./import/requirementParser";
+import { levelAllowsPregrado, programAllowList, programAllows, type StudentProgram } from "./import/official/programRestriction";
 
 export type PlanState = "approved" | "inCart" | "now" | "next" | "blocked";
 
@@ -29,6 +30,8 @@ export interface PlanContext {
   catalogCodes: Set<string>;
   rules?: CatalogRules;
   attestationsMet?: Set<string>;
+  /** the plan's program (IELE | IELC | DOBLE): Registro's program restriction */
+  programCode?: string;
 }
 
 export function creditsOf(ids: Set<string>, courses: Course[]): number {
@@ -47,6 +50,22 @@ export interface RequirementCheck {
   creditsShort: number;
   /** unmet admin gates */
   gateReasons: string[];
+  /** Registro restricts it to other programs / levels ("Solo para: …"), or null */
+  restrictedTo: string | null;
+}
+
+const STUDENT_PROGRAMS = new Set(["IELE", "IELC", "DOBLE"]);
+
+/** "Solo para: Maestría en IA" when Registro closes the course to this plan's students. */
+export function restrictionFor(
+  c: { programRestriction?: string | null; levelRestriction?: string | null },
+  programCode: string | undefined
+): string | null {
+  if (!programCode || !STUDENT_PROGRAMS.has(programCode)) return null;
+  if (c.programRestriction && !programAllows(c.programRestriction, programCode as StudentProgram))
+    return programAllowList(c.programRestriction) || "otros programas";
+  if (c.levelRestriction && !levelAllowsPregrado(c.levelRestriction)) return "posgrado";
+  return null;
 }
 
 /** Requirements of `course` against `have` (counts as approved), `together`
@@ -56,8 +75,9 @@ export function checkRequirements(
   have: Set<string>,
   together: Set<string>,
   credits: number,
-  ctx: Pick<PlanContext, "courses" | "catalogCodes" | "rules" | "attestationsMet">
+  ctx: Pick<PlanContext, "courses" | "catalogCodes" | "rules" | "attestationsMet" | "programCode">
 ): RequirementCheck {
+  const restrictedTo = restrictionFor(course, ctx.programCode);
   const concurrentOk = (code: string) => together.has(code);
   const prereqOk = satisfied(course.prereqTree, have, ctx.catalogCodes, concurrentOk);
   const missing = prereqOk ? [] : [...missingCodes(course.prereqTree, have, ctx.catalogCodes, concurrentOk)];
@@ -69,11 +89,12 @@ export function checkRequirements(
     ? evaluateGates(course, have, ctx.courses, { rules: ctx.rules, attestationsMet: ctx.attestationsMet, approvedCredits: credits })
     : [];
   return {
-    ok: prereqOk && coMissing.length === 0 && creditsShort === 0 && gateReasons.length === 0,
+    ok: prereqOk && coMissing.length === 0 && creditsShort === 0 && gateReasons.length === 0 && !restrictedTo,
     missing,
     coMissing,
     creditsShort,
     gateReasons,
+    restrictedTo,
   };
 }
 
@@ -176,6 +197,53 @@ export function wouldEnable(course: Course, ctx: PlanContext): StepZero {
     if (is === was) continue;
     if (is === "now") out.sameSemester.push({ course: c, by: enabledBy(c, withIt) });
     else if (is === "next" && was === "blocked") out.nextSemester.push({ course: c, by: enabledBy(c, withIt) });
+  }
+  return out;
+}
+
+export interface CartWarning {
+  course: Course;
+  /** prerequisites that must be APPROVED and aren't */
+  missing: Course[];
+  /** corequisites / "*" prerequisites that must be approved OR in the cart and aren't */
+  together: Course[];
+  /** requirement codes outside the plan that block it (named by the caller) */
+  external: string[];
+  creditsShort: number;
+  restrictedTo: string | null;
+}
+
+/** Cart courses added without their requirements (agreed 2026-10-29, release
+ * gate 1): buying them stays allowed, but the checkout summary lists each one
+ * and what it is missing. Re-evaluated on every cart change, so removing a
+ * corequisite from the cart (Física 2 under Fundamentos de electrónica) shows
+ * up here at once. Slots and requirement nodes are left out. */
+export function cartWarnings(ctx: PlanContext): CartWarning[] {
+  const { now } = planner(ctx);
+  const byCode = new Map(ctx.courses.map((c) => [c.codeNormalized, c]));
+  const byId = new Map(ctx.courses.map((c) => [c.id, c]));
+  const out: CartWarning[] = [];
+  for (const c of ctx.courses) {
+    if (!ctx.cart.has(c.id) || c.isPlaceholder) continue;
+    const r = now(c);
+    if (r.ok) continue;
+    const soft = new Set(c.concurrentPrereqIds ?? []);
+    const missing: Course[] = [];
+    const together: Course[] = [];
+    const external: string[] = [];
+    for (const code of r.missing) {
+      const m = byCode.get(code);
+      if (!m) external.push(code);
+      else if (soft.has(m.id)) together.push(m);
+      else missing.push(m);
+    }
+    for (const id of r.coMissing) {
+      const m = byId.get(id);
+      if (m && !together.includes(m)) together.push(m);
+    }
+    // a gate / credit-only shortfall still deserves a line
+    if (!missing.length && !together.length && !external.length && !r.creditsShort && !r.restrictedTo && !r.gateReasons.length) continue;
+    out.push({ course: c, missing, together, external, creditsShort: r.creditsShort, restrictedTo: r.restrictedTo });
   }
   return out;
 }

@@ -45,7 +45,10 @@ function courseCreateData(
   sortIndex: number,
   courseId: number | null
 ): Prisma.CatalogCourseUncheckedCreateInput {
-  const coreqExpr = ""; // template has no coreq column; API/courseDetails owns it
+  // the coordinator template has no coreq column (API/courseDetails owns it);
+  // the official matrix does ("IELE-1002L")
+  const coreqText = pc.coreqText ?? "";
+  const coreqExpr = coreqText.replace(/-/g, " ");
   return {
     catalogId,
     courseId,
@@ -59,9 +62,9 @@ function courseCreateData(
     placeholderLabel: pc.placeholderLabel ?? null,
     sortIndex,
     prereqText: pc.prereqText || null,
-    coreqText: null,
+    coreqText: coreqText || null,
     prereqTree: (parseRequirement(pc.prereqText) ?? Prisma.JsonNull) as unknown as Prisma.InputJsonValue,
-    coreqTree: parseRequirement(coreqExpr) as unknown as Prisma.InputJsonValue,
+    coreqTree: (parseRequirement(coreqExpr) ?? Prisma.JsonNull) as unknown as Prisma.InputJsonValue,
     pairingStatus: "needs_manual",
   };
 }
@@ -123,11 +126,15 @@ export async function applyPlanesJob(
           const created = await tx.catalog.create({
             data: {
               slug: meta.slug,
-              programCode: /IELC/i.test(meta.slug)
-                ? "IELC"
-                : /DOBLE/i.test(meta.slug)
-                  ? "DOBLE"
-                  : "IELE",
+              programCode: /^mielc/i.test(meta.slug)
+                ? "MIELC"
+                : /^miele/i.test(meta.slug)
+                  ? "MIELE"
+                  : /IELC/i.test(meta.slug)
+                    ? "IELC"
+                    : /DOBLE/i.test(meta.slug)
+                      ? "DOBLE"
+                      : "IELE",
               programName: meta.programName,
               variantLabel: meta.variantLabel,
               term: meta.term || "",
@@ -217,7 +224,11 @@ export async function applyPlanesJob(
             for (const ch of cdiff.changes) {
               const isConflict = cdiff.conflictFields.includes(ch.field);
               if (isConflict && !opts.forceConflicts) continue;
-              if (ch.field === "prereqText") {
+              if (ch.field === "coreqText") {
+                data.coreqText = ch.after || null;
+                data.coreqTree = (parseRequirement(String(ch.after ?? "").replace(/-/g, " ")) ??
+                  Prisma.JsonNull) as unknown as Prisma.InputJsonValue;
+              } else if (ch.field === "prereqText") {
                 data.prereqText = ch.after || null;
                 data.prereqTree = (parseRequirement(String(ch.after ?? "")) ??
                   Prisma.JsonNull) as unknown as Prisma.InputJsonValue;

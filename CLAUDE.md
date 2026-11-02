@@ -23,6 +23,10 @@ what's next (P2 admin, P3 Docker), and the gotchas.
 
 - `web/` — the Next.js app (all `npm run *` commands run **here**, not the repo root)
 - `app/` — the original Vite SPA, kept as migration reference until P1 is signed off, then deleted
+- `datos/PLANES_<term>.xlsx`, `BOLSAS_<term>.xlsx`, `PRERREQUISITOS_<term>.xlsx` — **the department's
+  official files (from 2026-11)**: the seed and `/administrador/carga` read them
+  (`web/lib/import/official`, [`docs/admin-official-load.md`](docs/admin-official-load.md)). The two
+  files below are the legacy inputs (`SEED_LEGACY=1`).
 - `PENSUMS PREGRADO (DOCUMENTO BASE)) CBU3.xlsx` — pensum structure (which course sits in
   which semester), owned by the department. `Excel_Registro.xlsx` — the Banner/Registro
   master export (prereqs/coreqs/names/credits/restrictions, ~117k rows spanning every term
@@ -38,7 +42,8 @@ cd web
 cp .env.example .env  # then fill in DATABASE_URL / DIRECT_URL (Neon) + secrets
 npm install          # then: npx prisma generate  (postinstall is sandboxed here)
 npm run db:deploy    # apply migrations
-npm run seed         # first load: DB from the two .xlsx + course API (~60s).
+npm run seed         # loads datos/ (official PLANES/BOLSAS/PRERREQUISITOS, ~10 s; idempotent).
+                     # Legacy pipeline: SEED_LEGACY=1 — DB from the two .xlsx + course API (~60s).
                      # Re-runs are non-destructive (keep admin edits) — force with
                      # SEED_REBUILD_COURSES=1 / SEED_RESET_META=1.
 npm run dev          # http://localhost:3000

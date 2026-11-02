@@ -2970,18 +2970,34 @@
 .cbuRules a:hover { text-decoration: underline; }
 
 /* "Ojo: no has aprobado …" — adding to the cart without the requirements is allowed */
+/* release gate 1 (2026-10-29): hard to miss AT the moment of adding — a
+   warning triangle and a highlighted amber container (amber, not red: red
+   stays for errors; #92400e on #fffbeb = 7.6:1) */
 .planWarn {
   flex: 1 0 100%;
   margin: 0;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--st-warn) 10%, white);
-  border: 1px solid color-mix(in srgb, var(--st-warn) 30%, white);
-  font-size: 12.5px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fffbeb;
+  border: 2px solid #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18);
+  font-size: 13px;
   line-height: 1.45;
-  color: var(--ink-2);
+  color: #78350f;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  animation: planWarnIn 0.5s ease-out 1;
 }
-.planWarn strong { color: var(--st-warn); }
+.planWarn strong { color: #92400e; }
+.planWarnIcon { flex: none; color: #d97706; line-height: 0; margin-top: 1px; }
+@keyframes planWarnIn {
+  0% { transform: translateY(4px); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.45); }
+  100% { transform: none; box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18); }
+}
+@media (prefers-reduced-motion: reduce) { .planWarn { animation: none; } }
+.offerMore { margin-top: 6px; font-size: 11.5px; color: var(--muted); }
+.offerMore summary { cursor: pointer; font-weight: 600; }
 
 /* ---- checkout step 0: qué se te habilita ---- */
 .bkZero { padding: 22px 26px 30px; max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
@@ -3048,3 +3064,17 @@
   color: #78350f;
 }
 .ofertaDown a { color: #92400e; font-weight: 700; }
+
+/* checkout: courses added without their requirements (release gate 1) —
+   orange, at the very top of the summary, on every step */
+.bkWarnBox { margin: 16px 26px 0; padding: 12px 14px; border-radius: 12px; background: #fff7ed; border: 2px solid #f97316; color: #7c2d12; font-size: 13px; line-height: 1.5; }
+.bkWarnBox > strong { display: block; font-size: 14px; color: #9a3412; margin-bottom: 4px; }
+.bkWarnBox ul { margin: 0 0 6px; padding-left: 18px; }
+.bkWarnBox > span { font-size: 12px; color: #9a3412; }
+
+/* K / K+1 (agreed 2026-10-29): what is taught this semester vs planning the next */
+.termBar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 20px; border-bottom: 1px solid var(--line); background: var(--surface); font-size: 12.5px; color: var(--muted); }
+.termBar button { font: inherit; font-weight: 600; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line-control); background: #fff; color: var(--ink-2); cursor: pointer; }
+.termBar button.termOn { background: var(--accent); border-color: var(--accent); color: #fff; }
+.ofertaFallback { padding: 6px 20px; background: #eff6ff; border-bottom: 1px solid #bfdbfe; color: #1e3a8a; font-size: 12.5px; }
+.ofertaFallback a { color: inherit; font-weight: 600; }

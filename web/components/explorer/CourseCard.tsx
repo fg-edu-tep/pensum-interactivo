@@ -1,6 +1,7 @@
 "use client";
 
 import type { BoxHalf } from "@/lib/electiveBoxes";
+import { spanText } from "@/lib/electiveBag";
 import { Handle, Position } from "reactflow";
 import type { Course, AvailabilityStatus } from "@/lib/types";
 import { groupOf, groupClass, toSentenceCase, termShort, type CourseGroup } from "./format";
@@ -173,21 +174,16 @@ export default function CourseCard({ data }: { data: CourseCardData }) {
   );
 }
 
-/** "Esta materia vale 4 créditos y ocupa 2 casillas" for every course in the box */
+/** "Esta materia vale 3 créditos: ocupa 1½ casillas" for every course in the box */
 function halvesTooltip(halves: [BoxHalf | null, BoxHalf | null]): string {
   const seen = new Set<string>();
   const parts: string[] = [];
   for (const h of halves) {
     if (!h || seen.has(h.key)) continue;
     seen.add(h.key);
-    const boxes = Math.ceil(h.credits / 2);
-    parts.push(
-      h.credits > 2 || h.cont
-        ? `${toSentenceCase(h.title)}: esta materia vale ${h.credits} créditos y ocupa ${boxes === 1 ? "1 casilla y media" : `${boxes} casillas`}`
-        : `${toSentenceCase(h.title)} (${h.credits} créditos)`
-    );
+    parts.push(h.credits !== 2 || h.cont ? `${toSentenceCase(h.title)}. ${spanText(h.credits)}` : `${toSentenceCase(h.title)} (2 créditos)`);
   }
-  if (!halves[0] || !halves[1]) parts.push("Medio espacio libre (1 crédito)");
+  if (!halves[0] || !halves[1]) parts.push("1 cr libre");
   return parts.join(" · ");
 }
 
@@ -213,7 +209,7 @@ function HalvesTitle({ halves }: { halves: [BoxHalf | null, BoxHalf | null] }) {
               {h.cont && <span className={styles.halfCont}> (cont.)</span>}
             </>
           ) : (
-            "Libre · 1 cr"
+            "1 cr libre"
           )}
         </span>
       ))}

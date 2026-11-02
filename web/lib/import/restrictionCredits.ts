@@ -8,8 +8,8 @@
 // who never passed Cálculo would qualify). The coordinator wants the student
 // to take it when actually advanced, so: required approved credits =
 // 15 × (highest excluded semester). "Excluye 1–4" → 60 credits. 15 is an
-// agreed constant (the real average is ~17). INCLUYE clauses and
-// "EXCLUYE ESTUDIANTE NUEVO" are ignored. Pure.
+// agreed constant (the real average is ~17). "EXCLUYE ESTUDIANTE NUEVO" is
+// read as "no primer semestre" (n ≥ 1). INCLUYE clauses are ignored. Pure.
 
 import { foldAccents } from "./textMatch";
 
@@ -33,9 +33,15 @@ export function highestExcludedSemester(restriction: string | null | undefined):
   if (!restriction) return 0;
   let max = 0;
   for (const clause of foldAccents(restriction).toUpperCase().split("&")) {
-    const m = clause.match(/EXCLUYE\s+INGRESA\s+A\s+(\w+)\s+SEMESTRE/);
+    if (/EXCLUYE\s+ESTUDIANTE\s+NUEVO/.test(clause)) {
+      max = Math.max(max, 1);
+      continue;
+    }
+    // "EXCLUYE INGRESA A  TERCER SEMESTRE" (Registro pads with spaces) or "… A SEMESTRE 12"
+    const m = clause.match(/EXCLUYE\s+INGRESA\s+A\s+(?:SEMESTRE\s+(\d+)|(\w+)\s+SEMESTRE)/);
     if (!m) continue;
-    const n = ORDINAL[m[1]] ?? (/^\d+$/.test(m[1]) ? Number(m[1]) : 0);
+    const word = m[1] ?? m[2];
+    const n = ORDINAL[word] ?? (/^\d+$/.test(word) ? Number(word) : 0);
     max = Math.max(max, n);
   }
   return max;

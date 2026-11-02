@@ -5,10 +5,13 @@ import { planTerm } from "@/lib/term";
 import { sortCatalogs } from "@/lib/catalogOrder";
 import { FALLBACK_GUIDE_URL } from "@/lib/links";
 import { useOfertaStatus } from "./explorer/useOfertaStatus";
-import { planner, stepZero, wouldEnable, type PlanContext } from "@/lib/planning";
+import { cartWarnings, planner, stepZero, wouldEnable, type PlanContext } from "@/lib/planning";
 import { slotOpenMap } from "@/lib/electiveAvailability";
 import { takesPregradoDefaults } from "@/lib/creditUnlocks";
-import { boxCredits, boxHalves, boxesOf, electiveBoxIds, migrateAssignments, ownerOf, placeHalves } from "@/lib/electiveBoxes";
+import { electiveBoxIds } from "@/lib/electiveBoxes";
+import { bagCourseId, bagKeyOf, isBagCourseId, layoutBag, migrateToBag, unnamedKey, type BagItem } from "@/lib/electiveBag";
+import { parseRequirement, collectCourseCodes } from "@/lib/import/requirementParser";
+import type { Course, ElectiveDTO } from "@/lib/types";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { AvailabilityStatus, CatalogPayload, ElectiveAssignment } from "@/lib/types";
 import {
@@ -21,6 +24,7 @@ import {
 import {
   buildShareUrl,
   loadApprovedFromHash,
+  loadBagFromHash,
   loadApprovedFromStorage,
   loadAttestationsFromHash,
   loadAttestationsFromStorage,
@@ -51,7 +55,8 @@ import QuickChooser from "./explorer/QuickChooser";
 import { BasketIcon } from "./explorer/icons";
 import { exploreSteps, avanceSteps, TOUR_INTRO, TOUR_LABEL, type TourKind } from "./explorer/tours";
 import SetupSheet from "./explorer/SetupSheet";
-import { groupOf, toSentenceCase, type CourseGroup } from "./explorer/format";
+import { groupOf, setPlanningTerm, toSentenceCase, type CourseGroup } from "./explorer/format";
+import { termLabel } from "@/lib/term";
 import "./explorer/tokens.css";
 import styles from "./explorer/explorer.module.css";
 
@@ -64,13 +69,46 @@ const INTRO_KEY = "pensum:intro-seen";
 const REFRESHER_KEY = "pensum:refresher-shown"; // sessionStorage: once per browser session
 
 const EMPTY_IDS: Set<string> = new Set();
+void EMPTY_IDS;
+
+const bagKey = (slug: string) => `pensum:${slug}:bolsa-electivas`;
+function loadBag(slug: string): BagItem[] {
+  try {
+    const raw = localStorage.getItem(bagKey(slug));
+    const v = raw ? (JSON.parse(raw) as BagItem[]) : [];
+    return Array.isArray(v) ? v.filter((x) => x && typeof x.key === "string" && typeof x.credits === "number") : [];
+  } catch {
+    return [];
+  }
+}
+function saveBag(slug: string, bag: BagItem[]) {
+  try {
+    localStorage.setItem(bagKey(slug), JSON.stringify(bag));
+  } catch {
+    /* storage unavailable */
+  }
+}
 
 export default function PensumExplorer({ data, mihorarioUrl }: Props) {
   // API preflight: when the course API errors, planning is disabled rather
   // than giving partial or wrong answers (it unblocks itself when it returns)
   const oferta = useOfertaStatus();
-  const planningBlocked = oferta === "down";
+  // With an official load (the department's files) the offering doesn't depend
+  // on the API: when it is down, the planner falls back to the loaded data
+  // instead of blocking (proposal of the 2026-10-29 review). Without one,
+  // planning stays blocked as agreed before.
+  const hasOfficialData = useMemo(
+    () => Object.values(data.offeringsByTerm ?? {}).some((m) => Object.values(m).some((o) => o.source === "archivo")),
+    [data.offeringsByTerm]
+  );
+  const planningBlocked = oferta === "down" && !hasOfficialData;
   const slug = data.catalog.slug;
+  // the period the cart plans for (declared at the official load)
+  const planningTerm = data.terms?.planning ?? planTerm();
+  setPlanningTerm(planningTerm);
+  const currentTerm = data.terms?.current ?? data.catalog.term;
+  // "Ver lo que se dicta este semestre" / "Planear mi próximo semestre"
+  const [viewTerm, setViewTerm] = useState<string>(planningTerm);
   const rules = data.rules;
   const router = useRouter();
   const pathname = usePathname();
@@ -94,6 +132,8 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
   const unlockTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [approved, setApproved] = useState<Set<string>>(new Set());
   const [assignments, setAssignments] = useState<ElectiveAssignments>({});
+  // the elective bag (lib/electiveBag.ts): ONE ordered list, the boxes are derived
+  const [bag, setBag] = useState<BagItem[]>([]);
   const [attestationsMet, setAttestationsMet] = useState<Set<string>>(new Set());
   const [planned, setPlanned] = useState<Map<string, string>>(new Map());
   // what the last "selección rápida por semestre" marked, so the next one replaces it
@@ -153,16 +193,26 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
   }, [relaciones, slug]);
 
   useEffect(() => {
-    setApproved(loadApprovedFromHash() ?? loadApprovedFromStorage(slug));
-    // older saves (one box = one course) get half-box positions
-    setAssignments(migrateAssignments(electiveBoxIds(data.courses), loadElectivesFromHash() ?? loadElectivesFromStorage(slug)));
-    setAttestationsMet(loadAttestationsFromHash() ?? loadAttestationsFromStorage(slug));
+    let approved0 = loadApprovedFromHash() ?? loadApprovedFromStorage(slug);
+    let assignments0 = loadElectivesFromHash() ?? loadElectivesFromStorage(slug);
     // drop plans for terms that have already started — a plan only makes sense
     // for the upcoming semester (plan codes sort chronologically)
-    const upcoming = planTerm();
-    setPlanned(
-      new Map(Object.entries(loadPlannedFromStorage(slug)).filter(([, t]) => t >= upcoming))
-    );
+    const upcoming = data.terms?.planning ?? planTerm();
+    let planned0 = new Map(Object.entries(loadPlannedFromStorage(slug)).filter(([, t]) => t >= upcoming));
+    let bag0 = loadBagFromHash<BagItem>() ?? loadBag(slug);
+    // older saves (a course anchored on an elective box) become bag items
+    const migrated = migrateToBag(electiveBoxIds(data.courses), assignments0, approved0, planned0);
+    if (migrated) {
+      bag0 = [...bag0, ...migrated.items.filter((i) => !bag0.some((b) => b.key === i.key))];
+      assignments0 = migrated.assignments;
+      approved0 = migrated.approved;
+      planned0 = migrated.planned;
+    }
+    setApproved(approved0);
+    setAssignments(assignments0);
+    setBag(bag0);
+    setAttestationsMet(loadAttestationsFromHash() ?? loadAttestationsFromStorage(slug));
+    setPlanned(planned0);
     try {
       setSetupSeen(localStorage.getItem(`pensum:${slug}:setup-seen`) === "1");
       setQuickMarkedState(new Set(JSON.parse(localStorage.getItem(`pensum:${slug}:quick-marked`) ?? "[]") as string[]));
@@ -191,6 +241,9 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
     if (hydrated) saveElectivesToStorage(slug, assignments);
   }, [assignments, hydrated, slug]);
   useEffect(() => {
+    if (hydrated) saveBag(slug, bag);
+  }, [bag, hydrated, slug]);
+  useEffect(() => {
     if (hydrated) saveAttestationsToStorage(slug, attestationsMet);
   }, [attestationsMet, hydrated, slug]);
   useEffect(() => {
@@ -205,12 +258,22 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
     return () => document.removeEventListener("keydown", onKey);
   }, []);
 
-  // half-box electives (lib/electiveBoxes.ts): elective boxes keep "2 cr" and
-  // their name; what fills each half is drawn on the card. Other slots (EFI,
-  // CI…) take the chosen course's name and credits, as before.
+  // the elective bag (lib/electiveBag.ts): the 2-credit ELECTIVA boxes are one
+  // bag of 1-credit halves; the chosen electives fill it in the order they
+  // were added and the layout is recomputed on every change. Boxes keep
+  // "2 cr" and their name; what fills each half is drawn on the card. Other
+  // slots (EFI, CI…) take the chosen course's name and credits, as before.
   const boxIds = useMemo(() => electiveBoxIds(data.courses), [data.courses]);
   const boxSet = useMemo(() => new Set(boxIds), [boxIds]);
-  const halvesByBox = useMemo(() => boxHalves(boxIds, assignments), [boxIds, assignments]);
+  // boxes seen "sin especificar" (quick selection, "Marcar como vista" on an empty box)
+  const skipBoxes = useMemo(() => new Set(boxIds.filter((b) => approved.has(b))), [boxIds, approved]);
+  const bagLayout = useMemo(() => layoutBag(boxIds, bag, skipBoxes), [boxIds, bag, skipBoxes]);
+  const halvesByBox = bagLayout.boxes;
+  /** bag item keys covering a box, in order */
+  const occupantsOf = useCallback(
+    (boxId: string): string[] => [...new Set((bagLayout.boxes.get(boxId) ?? [null, null]).filter(Boolean).map((h) => h!.key))],
+    [bagLayout]
+  );
   const courses = useMemo(
     () =>
       data.courses.map((c) => {
@@ -220,23 +283,57 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
       }),
     [data.courses, assignments, boxSet]
   );
-  // credit accounting: a box counts what fills it (1 per occupied half, plus
-  // the course's overflow on its first box; 2 when empty) — so a course's real
-  // credits count once, and boxes still read "2 cr"
-  const creditCourses = useMemo(() => {
-    const cr = boxCredits(boxIds, assignments);
-    return courses.map((c) => (cr.has(c.id) ? { ...c, credits: cr.get(c.id)! } : c));
-  }, [courses, boxIds, assignments]);
-  // the cart / checkout see a NAMED elective as the real course (its code →
-  // live sections); a box that only continues a course is listed with its first box
+  // each bag item is a course of its own for credits, the cart and checkout
+  // (never drawn on the map): its code → live sections, its prerequisites →
+  // the cart warnings
+  const bagCourses = useMemo<Course[]>(() => {
+    const byId = new Map(data.electives.map((e) => [e.id, e]));
+    const codes = new Set(data.courses.map((c) => c.codeNormalized));
+    const idByCode = new Map(data.courses.map((c) => [c.codeNormalized, c.id]));
+    return bag.map((it) => {
+      const e: ElectiveDTO | undefined = it.electiveId != null ? byId.get(it.electiveId) : undefined;
+      const tree = e?.registroPrereqText ? parseRequirement(e.registroPrereqText) : null;
+      const inPlan = [...collectCourseCodes(tree)].filter((c) => codes.has(c));
+      const firstBox = bagLayout.items.get(it.key)?.boxes[0];
+      const sem = data.courses.find((c) => c.id === firstBox)?.semester ?? data.courses.find((c) => c.id === boxIds[boxIds.length - 1])?.semester ?? 8;
+      return {
+        id: bagCourseId(it.key),
+        code: it.code ? it.code.replace(/^([A-Z]+)(\d)/, "$1 $2") : "ELECTIVA",
+        codeNormalized: it.code ?? bagCourseId(it.key),
+        name: it.title,
+        credits: it.credits,
+        semester: sem,
+        type: "electiva",
+        isPlaceholder: !it.code,
+        placeholderKind: it.code ? null : "ELECTIVA",
+        placeholderLabel: it.code ? null : it.title,
+        prereqText: e?.registroPrereqText ?? "",
+        coreqText: e?.coreqText ?? "",
+        prereqTree: tree,
+        prereqCourseIds: inPlan.map((c) => idByCode.get(c)!).filter(Boolean),
+        prereqExternal: [],
+        coreqTree: null,
+        coreqCourseIds: [],
+        coreqExternal: [],
+        minCredits: e?.minCredits ?? null,
+        programRestriction: e?.programRestriction ?? null,
+        levelRestriction: e?.registroLevel ?? null,
+      } satisfies Course;
+    });
+  }, [bag, data.electives, data.courses, bagLayout, boxIds]);
+  // credit accounting: a bag course counts its real credits once (overflow
+  // included); a box counts 2 only when it was seen without naming a course
+  const creditCourses = useMemo(() => [...courses, ...bagCourses], [courses, bagCourses]);
+  // the cart / checkout: bag courses are listed as themselves; a box is never
+  // a cart item (the "phantom elective" of the 2026-10-29 demo) unless a
+  // student planned an empty one on purpose before this change
   const basketCourses = useMemo(
-    () =>
-      courses.flatMap((c) => {
+    () => [
+      ...courses.flatMap((c) => {
         if (!c.isPlaceholder) return [c];
-        const owner = ownerOf(c.id, assignments);
-        const a = owner ? assignments[owner] : undefined;
+        if (boxSet.has(c.id)) return [c];
+        const a = assignments[c.id];
         if (!a) return [c];
-        if (boxSet.has(c.id) && (boxesOf(a)[0] ?? owner) !== c.id) return [];
         const named = { ...c, name: a.title, credits: a.credits ?? c.credits };
         if (!a.code) return [named];
         return [
@@ -252,16 +349,9 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
           },
         ];
       }),
-    [courses, assignments, boxSet]
-  );
-  /** the boxes a box shares a course with (itself included) */
-  const boxGroup = useCallback(
-    (id: string): string[] => {
-      if (!boxSet.has(id)) return [id];
-      const owner = ownerOf(id, assignments);
-      return owner ? boxesOf(assignments[owner]) : [id];
-    },
-    [boxSet, assignments]
+      ...bagCourses,
+    ],
+    [courses, assignments, boxSet, bagCourses]
   );
 
   const catalogCodes = useMemo(() => catalogCodesOf(courses), [courses]);
@@ -312,8 +402,8 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
   // (and "*" prerequisites) approved or in the cart. The market reads it live,
   // so putting Variable Compleja in the cart opens Elementos right away.
   const planCtx = useMemo<PlanContext>(
-    () => ({ approved: statusApprovedSet, cart: plannedSet, courses: creditCourses, catalogCodes, rules, attestationsMet }),
-    [statusApprovedSet, plannedSet, creditCourses, catalogCodes, rules, attestationsMet]
+    () => ({ approved: statusApprovedSet, cart: plannedSet, courses: creditCourses, catalogCodes, rules, attestationsMet, programCode: data.catalog.programCode }),
+    [statusApprovedSet, plannedSet, creditCourses, catalogCodes, rules, attestationsMet, data.catalog.programCode]
   );
   const plan = useMemo(() => planner(planCtx), [planCtx]);
   // the same context with the REAL approved set (not the setup-sheet preview)
@@ -327,6 +417,8 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
         catalogCodes,
         approvedCredits: plan.creditsA,
         pregrado: takesPregradoDefaults(data.catalog),
+        programCode: data.catalog.programCode,
+        pensumCodes: catalogCodes,
       }),
     [courses, data.electives, data.catalog.programCode, statusApprovedSet, plannedSet, catalogCodes, plan.creditsA]
   );
@@ -341,8 +433,22 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
       if (s !== "approved" && plan.now(c).gateReasons.length > 0) lockedIds.add(c.id);
     }
     for (const [id, open] of slotOpen) if (!open && statusById.get(id) !== "approved") statusById.set(id, "blocked");
+    // a box filled by bag courses reads as seen when all of them are
+    for (const b of boxIds) {
+      const occ = occupantsOf(b);
+      if (occ.length && occ.every((k) => statusApprovedSet.has(bagCourseId(k)))) statusById.set(b, "approved");
+    }
     return { statusById, lockedIds };
-  }, [courses, plan, slotOpen]);
+  }, [courses, plan, slotOpen, boxIds, occupantsOf, statusApprovedSet]);
+  // the map's "en tu canasta" state: a box is planned when a course in it is
+  const plannedForMap = useMemo(() => {
+    const m = new Map(planned);
+    for (const b of boxIds) {
+      const t = occupantsOf(b).map((k) => planned.get(bagCourseId(k))).find(Boolean);
+      if (t) m.set(b, t);
+    }
+    return m;
+  }, [planned, boxIds, occupantsOf]);
 
   const matchedIds = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -383,9 +489,10 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
     if (chk.ok) return [];
     const byCode = new Map(courses.map((c) => [c.codeNormalized, c]));
     const names = [...chk.missing, ...chk.coMissing.map((id) => courses.find((c) => c.id === id)?.codeNormalized ?? id)].map(
-      (code) => byCode.get(code)?.name ?? code
+      (code) => toSentenceCase(byCode.get(code)?.name ?? data.codeNames?.[code] ?? code)
     );
     if (chk.creditsShort > 0) names.push(`${selectedCourse.minCredits} créditos aprobados`);
+    if (chk.restrictedTo) names.push(`estar en ${chk.restrictedTo} (restricción de Registro)`);
     return names;
   }, [selectedCourse, plan, courses]);
 
@@ -439,14 +546,14 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
   // next-semester courses for the current cart
   const zero = useMemo(() => (planned.size === 0 ? { sameSemester: [], nextSemester: [] } : stepZero(realPlanCtx)), [planned.size, realPlanCtx]);
 
-  // "La vas a poder ver" markers: set when checkout step 0 is shown, tied to
-  // the cart that produced them, so they never show a stale result.
-  const cartKey = useMemo(() => [...plannedSet].sort().join(","), [plannedSet]);
-  const [nextMarks, setNextMarks] = useState<{ cartKey: string; ids: Set<string> } | null>(null);
-  const nextIds = useMemo(() => (nextMarks && nextMarks.cartKey === cartKey ? nextMarks.ids : EMPTY_IDS), [nextMarks, cartKey]);
-  const handleStepZeroShown = useCallback(() => {
-    setNextMarks({ cartKey, ids: new Set(zero.nextSemester.map((x) => x.course.id)) });
-  }, [cartKey, zero]);
+  // "La vas a poder ver" markers: recomputed on EVERY cart change (agreed
+  // 2026-10-29, release gate 2) — adding Computación científica marks
+  // Optimización at once, removing it clears the mark. Only an annotation:
+  // nothing is ever added for the student. Step 0 stays as the summary.
+  const nextIds = useMemo(() => new Set(zero.nextSemester.map((x) => x.course.id)), [zero]);
+  const handleStepZeroShown = useCallback(() => {}, []);
+  // cart courses added without their requirements (release gate 1)
+  const warnings = useMemo(() => (planned.size === 0 ? [] : cartWarnings(realPlanCtx)), [planned.size, realPlanCtx]);
 
   const tourSteps = useMemo(
     () => (!tour ? [] : tour.kind === "explore" ? exploreSteps(tourAnchorCourse?.id ?? null) : avanceSteps()),
@@ -597,56 +704,99 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
 
   useEffect(() => () => { if (unlockTimer.current) clearTimeout(unlockTimer.current); }, []);
 
-  // a course spanning several elective boxes is seen / planned as a whole
+  // an elective box filled by bag courses is seen / planned through them
   function handleToggleApproved(id: string) {
-    const group = boxGroup(id);
+    const occ = boxSet.has(id) ? occupantsOf(id).map(bagCourseId) : [];
+    const ids = occ.length ? occ : [id];
     setApproved((prev) => {
       const next = new Set(prev);
-      const on = !next.has(id);
-      for (const g of group) on ? next.add(g) : next.delete(g);
+      const on = !ids.every((x) => next.has(x));
+      for (const x of ids) on ? next.add(x) : next.delete(x);
       return next;
     });
     setPlanned((prev) => {
-      if (!group.some((g) => prev.has(g))) return prev;
+      if (!ids.some((x) => prev.has(x))) return prev;
       const next = new Map(prev);
-      for (const g of group) next.delete(g);
+      for (const x of ids) next.delete(x);
       return next;
     });
   }
 
   const handleTogglePlanned = useCallback(
     (id: string, term: string | null) => {
-      const group = boxGroup(id);
+      const occ = boxSet.has(id) ? occupantsOf(id).map(bagCourseId) : [];
+      const ids = occ.length ? occ : [id];
       setPlanned((prev) => {
         const next = new Map(prev);
-        for (const g of group) term ? next.set(g, term) : next.delete(g);
+        for (const x of ids) term ? next.set(x, term) : next.delete(x);
         return next;
       });
+      // the cart is the course: taking a bag course out of the cart takes it
+      // out of the bag too, unless it was seen (one source of truth, §5.3)
+      if (!term) {
+        const gone = ids.filter(isBagCourseId).map(bagKeyOf);
+        if (gone.length) setBag((prev) => prev.filter((it) => !gone.includes(it.key) || approved.has(bagCourseId(it.key))));
+      }
     },
-    [boxGroup]
+    [boxSet, occupantsOf, approved]
   );
+
+  /** Bag actions from the elective picker: add (to the cart or as seen), toggle, remove. */
+  const handleBagAdd = useCallback(
+    (item: Omit<BagItem, "key"> & { key?: string }, as: "planned" | "approved") => {
+      const key = item.key ?? (item.electiveId != null ? `e${item.electiveId}` : unnamedKey(bag));
+      setBag((prev) => (prev.some((i) => i.key === key) ? prev : [...prev, { ...item, key }]));
+      const id = bagCourseId(key);
+      if (as === "approved") {
+        setApproved((prev) => new Set([...prev, id]));
+        setPlanned((prev) => {
+          if (!prev.has(id)) return prev;
+          const next = new Map(prev);
+          next.delete(id);
+          return next;
+        });
+      } else {
+        setPlanned((prev) => new Map(prev).set(id, planningTerm));
+      }
+    },
+    [bag, planningTerm]
+  );
+  const handleBagRemove = useCallback((key: string) => {
+    const id = bagCourseId(key);
+    setBag((prev) => prev.filter((i) => i.key !== key));
+    setApproved((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+    setPlanned((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Map(prev);
+      next.delete(id);
+      return next;
+    });
+  }, []);
 
   const handleAssignElective = useCallback(
     (slotId: string, assignment: ElectiveAssignment | null) => {
       setAssignments((prev) => {
         const next = { ...prev };
-        if (!boxSet.has(slotId)) {
-          if (assignment) next[slotId] = assignment;
-          else delete next[slotId];
-          return next;
-        }
-        // elective box: replace whatever covers it, then fill halves from here
-        const owner = ownerOf(slotId, prev);
-        const anchor = owner ?? slotId;
-        if (owner) delete next[owner];
-        if (assignment) {
-          const { halves, overflow } = placeHalves(boxIds, next, anchor, assignment.credits ?? 2);
-          next[anchor] = { ...assignment, halves, overflow };
-        }
+        if (assignment) next[slotId] = assignment;
+        else delete next[slotId];
         return next;
       });
+      // removing the course of a slot that was in the cart takes the slot out
+      // of the cart too — no unnamed "phantom" elective stays behind (§5.2)
+      if (!assignment)
+        setPlanned((prev) => {
+          if (!prev.has(slotId)) return prev;
+          const next = new Map(prev);
+          next.delete(slotId);
+          return next;
+        });
     },
-    [boxSet, boxIds]
+    []
   );
 
   const handleToggleAttestation = useCallback((id: string) => {
@@ -673,7 +823,7 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
   }
 
   async function handleShare() {
-    const url = buildShareUrl(approved, assignments, attestationsMet);
+    const url = buildShareUrl(approved, assignments, attestationsMet, bag);
     try {
       await navigator.clipboard.writeText(url);
       setShareFeedback("¡Enlace copiado!");
@@ -690,6 +840,12 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
     if (!ok) return;
     setApproved(new Set());
     setAssignments({});
+    setBag([]);
+    try {
+      localStorage.removeItem(bagKey(slug));
+    } catch {
+      /* ignore */
+    }
     setAttestationsMet(new Set());
     setPlanned(new Map());
     setJustUnlocked(new Set());
@@ -844,7 +1000,28 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
         onReset={handleReset}
       />
 
-      {oferta === "down" && (
+      {currentTerm !== planningTerm && (
+        <div className={styles.termBar} role="group" aria-label="Periodo de la oferta">
+          <span>Oferta:</span>
+          <button type="button" aria-pressed={viewTerm === currentTerm} className={viewTerm === currentTerm ? styles.termOn : undefined} onClick={() => setViewTerm(currentTerm)}>
+            Ver lo que se dicta este semestre ({termLabel(currentTerm)})
+          </button>
+          <button type="button" aria-pressed={viewTerm === planningTerm} className={viewTerm === planningTerm ? styles.termOn : undefined} onClick={() => setViewTerm(planningTerm)}>
+            Planear mi próximo semestre ({termLabel(planningTerm)})
+          </button>
+        </div>
+      )}
+
+      {oferta === "down" && hasOfficialData && (
+        <div className={styles.ofertaFallback} role="status">
+          La oferta en línea no responde: usamos la oferta y los requisitos que cargó el departamento para {termLabel(planningTerm)}.{" "}
+          <a href={FALLBACK_GUIDE_URL} target="_blank" rel="noopener noreferrer">
+            Guía para armar tu horario →
+          </a>
+        </div>
+      )}
+
+      {oferta === "down" && !hasOfficialData && (
         <div className={styles.ofertaDown} role="alert">
           <strong>La oferta en línea no está disponible en este momento.</strong>{" "}
           {mode === "progress"
@@ -879,7 +1056,7 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
           matchedIds={matchedIds}
           statusById={statusById}
           lockedIds={lockedIds}
-          plannedIds={planned}
+          plannedIds={plannedForMap}
           stagedIds={staged}
           justUnlockedIds={justUnlocked}
           nextIds={nextIds}
@@ -960,7 +1137,7 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
               <strong>{planned.size > 0 ? "Revisar mi canasta" : "Mi canasta"}</strong>
               <span>
                 {planned.size} curso{planned.size === 1 ? "" : "s"} ·{" "}
-                {courses.filter((c) => planned.has(c.id)).reduce((s, c) => s + c.credits, 0)} cr
+                {basketCourses.filter((c) => planned.has(c.id)).reduce((s, c) => s + c.credits, 0)} cr
               </span>
             </span>
             {planned.size > 0 && (
@@ -1020,13 +1197,21 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
             directDependentIds={directDependentIds}
             chainExtraCount={chainExtraCount}
             approved={approved}
-            isPlanned={selectedCourse ? planned.has(selectedCourse.id) : false}
-            offering={selectedCourse ? data.offerings[selectedCourse.codeNormalized] : undefined}
-            term={data.catalog.term}
+            isPlanned={selectedCourse ? plannedForMap.has(selectedCourse.id) : false}
+            offering={selectedCourse ? (data.offeringsByTerm?.[viewTerm] ?? data.offerings)[selectedCourse.codeNormalized] : undefined}
+            term={viewTerm}
             mihorarioUrl={mihorarioUrl}
             electives={data.electives}
             programCode={data.catalog.programCode}
-            assignment={selectedCourse ? assignments[ownerOf(selectedCourse.id, assignments) ?? selectedCourse.id] : undefined}
+            assignment={selectedCourse && !boxSet.has(selectedCourse.id) ? assignments[selectedCourse.id] : undefined}
+            bag={bag}
+            bagLayout={bagLayout}
+            isBox={selectedCourse ? boxSet.has(selectedCourse.id) : false}
+            boxOccupants={selectedCourse && boxSet.has(selectedCourse.id) ? occupantsOf(selectedCourse.id) : []}
+            onBagAdd={handleBagAdd}
+            onBagRemove={handleBagRemove}
+            codeNames={data.codeNames}
+            bagState={(key: string) => (approved.has(bagCourseId(key)) ? "approved" : planned.has(bagCourseId(key)) ? "planned" : "chosen")}
             attestationsMet={attestationsMet}
             onToggleAttestation={handleToggleAttestation}
             onAssignElective={handleAssignElective}
@@ -1067,7 +1252,7 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
         {showPlanner && (
           <PlannerPanel
             planningBlocked={planningBlocked}
-            courses={courses}
+            courses={basketCourses}
             approved={effectiveApproved}
             planned={planned}
             statusById={statusById}
@@ -1092,10 +1277,12 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
           courses={basketCourses}
           planned={planned}
           approved={effectiveApproved}
-          planTermCode={planTerm()}
+          planTermCode={planningTerm}
           focusCourseId={basketFocusId}
           zero={zero}
-          onAdd={(id) => handleTogglePlanned(id, planTerm())}
+          warnings={warnings}
+          codeNames={data.codeNames}
+          onAdd={(id) => handleTogglePlanned(id, planningTerm)}
           onStepZeroShown={handleStepZeroShown}
           mihorarioUrl={mihorarioUrl}
           onClose={() => setBasketOpen(false)}

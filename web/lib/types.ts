@@ -76,6 +76,12 @@ export interface Course {
   lastOfferedTerm?: string | null;
   /** next planned offering, from the department's planning file / admin */
   nextOfferingTerm?: string | null;
+  /** Registro "Restricción de programa" / "de nivel" (official load) —
+   * lib/import/official/programRestriction.ts reads them */
+  programRestriction?: string | null;
+  levelRestriction?: string | null;
+  /** the bag's raw PROXIMO: "SEM" | "NODEF" | "202810" | null */
+  offeringProjection?: string | null;
   /** for a RequirementNode-backed slot: which attestation flips its "cumplido"
    * state, plus its editable info text/link (all from the DB row) */
   requirementAttestationId?: string | null;
@@ -119,6 +125,8 @@ export interface OfferingBadge {
   ptrm: string[]; // e.g. ["8A", "16"]
   /** true when the last sync attempt failed and this data may be stale/absent. */
   syncFailed?: boolean;
+  /** "api" (live) | "archivo" (the official load's requisitos / projection) */
+  source?: string;
 }
 
 /** One elective course from the "BOLSA DE ELECTIVAS" spreadsheets. */
@@ -154,6 +162,20 @@ export interface ElectiveDTO {
   nextOfferingTerm?: string | null;
   /** Registro's "Restricción de nivel" ("INCLUYE MAGISTER" = master's only) */
   registroLevel?: string | null;
+  /** official bag (BOLSAS): independent attributes per program */
+  attrs?: Record<"IELE" | "IELC" | "MIELE" | "MIELC", ElectiveProgramAttrs> | null;
+  /** Registro "Restricción de programa" (MAIA courses: only some master's) */
+  programRestriction?: string | null;
+  /** the bag's raw PROXIMO: "SEM" | "NODEF" | "202810" | null */
+  projection?: string | null;
+  coreqText?: string | null;
+}
+
+export interface ElectiveProgramAttrs {
+  obligatoria: boolean;
+  electiva: boolean;
+  integrador: boolean;
+  profundizacion: boolean;
 }
 
 /** Synthetic node for the English-reading graduation requirement (point 5).
@@ -163,7 +185,16 @@ export const ENGLISH_ATTESTATION_ID = "idioma";
 export const INTERNACIONALIZACION_ATTESTATION_ID = "internacionalizacion";
 export const SABERPRO_ATTESTATION_ID = "saberpro";
 /** prereq codes that mean "the English reading requirement" */
-export const ENGLISH_REQ_CODE_RE = /^(LENG|ENGL|RLEC|IDIO)/;
+// Only the ENGLISH codes: LENG 2999 (requisito lectura inglés), LENG 1156
+// (English 06), LENG 1103 (Inglés 3), ENGL7, INLE4, RLEC1, RLEN1. LENG 1512 /
+// LENG 1501 are the SPANISH writing requirement (with ESCR 1102 and CCOM 1100)
+// and must not light up the English node (fixed 2026-11-02, Fundamentos de
+// electrónica showed "lectura en inglés").
+export const ENGLISH_REQ_CODE_RE = /^(LENG(1103|1156|2999)|ENGL|RLEC|RLEN|INLE|IDIO)/;
+/** the pre-2026-11 regex, still stored in older RequirementNode rows */
+export const LEGACY_ENGLISH_REQ_CODE_SOURCE = "^(LENG|ENGL|RLEC|IDIO)";
+/** the Spanish writing requirement's codes (Registro OR-groups them) */
+export const SPANISH_WRITING_CODE_RE = /^(ESCR|LENG1512|LENG1501|LITE1611|LITE1622|CCOM1100)/;
 
 // ---------- admin progression rules ----------
 
@@ -259,4 +290,11 @@ export interface CatalogPayload {
   rules: CatalogRules;
   /** non-course graduation requirements (also present in `courses` as nodes) */
   requirementNodes: RequirementNodeDTO[];
+  /** the two periods a student can look at (agreed 2026-10-29): the current
+   * one (calendar) and the planning one (declared at the official load) */
+  terms?: { current: string; planning: string };
+  /** offering per period, keyed like `offerings` (which is the planning one) */
+  offeringsByTerm?: Record<string, Record<string, OfferingBadge>>;
+  /** code → course name, for every code a requirement mentions (official load) */
+  codeNames?: Record<string, string>;
 }

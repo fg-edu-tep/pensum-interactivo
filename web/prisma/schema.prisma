@@ -88,6 +88,12 @@ model Course {
   restrictionText     String?
   lastOfferedTerm     String?
   nextOfferingTerm    String?
+  // --- official load (lib/import/official): Registro "Restricción de programa"
+  //     / "de nivel" at the planning period, and the bag's raw PROXIMO value
+  //     ("SEM" | "NODEF" | "202810" | "") ---
+  programRestriction  String?
+  levelRestriction    String?
+  offeringProjection  String?
   // --- catalog description, from the smartcatalogiq scraper (scripts/scrapeDescriptions.ts).
   //     Admin-editable; the seed never touches these. ---
   description        String?
@@ -163,6 +169,10 @@ model CourseOffering {
   detailsMaster   Json? // raw `master` array (unused for now)
   detailsError    String? // set when the courseDetails fetch failed
   detailsSyncedAt DateTime?
+  /// "api" (live course API) | "archivo" (official load: the course has a row
+  /// for this period in the requisitos export, or the bag projects it) — an
+  /// API row always replaces an "archivo" one
+  source          String    @default("api")
 
   course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
@@ -260,8 +270,28 @@ model Elective {
   registroLevel      String?
   /** next planned offering (department planning file / admin) */
   nextOfferingTerm   String?
+  // --- official bag (BOLSAS_<term>.xlsx): per-program attributes
+  //     { IELE:{obligatoria,electiva,integrador,profundizacion}, IELC, MIELE, MIELC },
+  //     the raw PROXIMO value and Registro's program restriction ---
+  attrs              Json?
+  projection         String?
+  programRestriction String?
+  coreqText          String?
+  /** "bolsas" (official bag) | "legacy" (old electivas/*.xlsx) | "admin" */
+  source             String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+}
+
+/// Course names by code, from the last official load's requisitos export
+/// (every code it mentions) — used to show requirements by NAME ("Aún no:
+/// necesitas Fundamentos de circuitos"), including courses outside the pensum.
+model CodeName {
+  code      String   @id
+  name      String
+  credits   Float?
+  period    String
+  updatedAt DateTime @updatedAt
 }
 
 model AuditLog {

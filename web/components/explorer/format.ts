@@ -66,9 +66,14 @@ export function toSentenceCase(raw: string): string {
   if (!raw) return raw;
   const lower = raw.toLocaleLowerCase("es");
   const sentence = lower.charAt(0).toLocaleUpperCase("es") + lower.slice(1);
-  return sentence.replace(/\p{L}+/gu, (word) => {
+  return sentence.replace(/\p{L}+/gu, (word, offset: number, all: string) => {
     const upper = word.toLocaleUpperCase("es");
-    return ACRONYMS.includes(upper) ? upper : word;
+    if (ACRONYMS.includes(upper)) return upper;
+    // roman numerals: "Física II", "Taller IEE 1", "Cálculo III" ("i"/"v" only
+    // when they end the name or precede a parenthesis, so the word "i" never is)
+    if (/^(II|III|IV|VI|VII|VIII|IX)$/.test(upper)) return upper;
+    if (/^(I|V|X)$/.test(upper) && offset > 0 && /^\s*(\(|$)/.test(all.slice(offset + word.length))) return upper;
+    return word;
   });
 }
 
@@ -82,9 +87,16 @@ export const termShort = termLabel;
 
 /** The term the basket/planner targets — derived from today's date, not from
  * the (seed-time) catalog term, so it rolls over on its own. */
+// The period the cart plans for: the one the official load opened for planning
+// (payload.terms.planning), set once by PensumExplorer; the calendar's next
+// regular semester before that.
+let planningOverride: string | null = null;
+export function setPlanningTerm(code: string | null | undefined) {
+  planningOverride = code && /^\d{6}$/.test(code) ? code : null;
+}
 export function nextTermShort(): string {
-  return termLabel(planTerm());
+  return termLabel(nextTermCode());
 }
 export function nextTermCode(): string {
-  return planTerm();
+  return planningOverride ?? planTerm();
 }
