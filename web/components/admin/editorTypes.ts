@@ -28,6 +28,10 @@ export interface EditorCourse {
   placeholderKind: string;
   placeholderLabel: string;
   prereqText: string;
+  coreqText: string;
+  /** admin override: the plan's value beats the API */
+  prereqOverride: boolean;
+  coreqOverride: boolean;
   pairingStatus: string;
   manuallyEdited: boolean;
   lockedFields: string[];

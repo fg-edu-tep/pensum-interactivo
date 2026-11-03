@@ -5,6 +5,9 @@
 //
 // Priority (first source that HAS data wins; an empty source is skipped, never
 // treated as "no requirement"):
+//   0. override     an admin set CatalogCourse.prereqOverride/coreqOverride:
+//                   the document decides, even over the API — and an empty
+//                   document then means "no requirement".
 //   1. api          live course details for the catalog's term. When the
 //                   details were fetched and list no requirement, that is data:
 //                   the course has none (for prereqs, only when the API text is
@@ -49,6 +52,9 @@ export interface RequirementCandidates {
     prereqTree: ReqNode | null;
     coreqText: string | null;
     coreqTree: ReqNode | null;
+    /** admin override: the document beats every other source */
+    prereqOverride?: boolean;
+    coreqOverride?: boolean;
   };
   registro?: RegistroEntry | null;
   /** offerings of OTHER terms, any order (sorted newest first here) */
@@ -62,6 +68,8 @@ export interface ResolvedRequirement {
   source: RequirementSource;
   /** the term/period the data belongs to, when the source has one */
   sourceTerm: string | null;
+  /** true when the document won by admin override */
+  overridden?: boolean;
 }
 
 export function detailsOk(o: ApiDetails | null | undefined): boolean {
@@ -85,6 +93,14 @@ function apiText(o: ApiDetails, field: ReqField, tree: ReqNode | null): string {
 const NONE: ResolvedRequirement = { tree: null, text: "", source: null, sourceTerm: null };
 
 export function resolveRequirement(field: ReqField, c: RequirementCandidates): ResolvedRequirement {
+  const docText = (field === "prereq" ? c.document.prereqText : c.document.coreqText) ?? "";
+  const docTree = (field === "prereq" ? c.document.prereqTree : c.document.coreqTree) ?? null;
+
+  // 0. admin override: the document decides, empty or not
+  if (field === "prereq" ? c.document.prereqOverride : c.document.coreqOverride) {
+    return { tree: docTree, text: docTree ? docText.trim() : "", source: "document", sourceTerm: null, overridden: true };
+  }
+
   // 1. live API, this term
   const cur = c.current;
   if (cur) {
@@ -95,8 +111,6 @@ export function resolveRequirement(field: ReqField, c: RequirementCandidates): R
   }
 
   // 2. the plan's own document data
-  const docText = (field === "prereq" ? c.document.prereqText : c.document.coreqText) ?? "";
-  const docTree = (field === "prereq" ? c.document.prereqTree : c.document.coreqTree) ?? null;
   if (docTree) return { tree: docTree, text: docText.trim(), source: "document", sourceTerm: null };
 
   // 3. the Registro dictionary
