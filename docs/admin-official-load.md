@@ -33,6 +33,10 @@ Rules:
   - `IELE-4XXX` / `YYYY-4XXX` → master's slots ("CURSO LIBRE" → CLE).
 - **Labs and companions:** 0-credit rows (`LAB…`, `TRAB. ASIST…`, codes ending in L/T/P, and `IELE-3403`) are **not map nodes**. They stay the corequisite of their parent course (`IELE-1002` → `IELE-1002L`). 20 such rows in 202710.
 - **TIPO:** Obligatorio → núcleo, Proyecto → proyecto, CBU → cbu, Electiva → electiva (CLE → libre elección).
+  - TIPO is also the course's **group on the map** (`CatalogCourse.category`, `lib/courseCategory.ts`). It accepts those four values or the seven categories of the pensum PDF: Fundamentos de Ingeniería, Fundamentos Transversales IEE, Fundamentos Específicos, Ciclo Terminal, Ciclo de Ciencias y Matemáticas, Proyectos, Educación General.
+  - The PDF colours and the legend follow (`components/explorer/tokens.css`).
+  - A file that mixes "Obligatorio" with PDF categories gets a warning.
+  - Admins can change or pin the group per course ("Grupo" in the catalogue editor).
 - **Names:** Banner truncates names to 30 characters ("ELEMENT.SISTEMAS ELÉCTRICOS"). A course already in a plan keeps its curated name; new courses take the file's name.
 - **Requisites:** the PLANES requisites are applied, and they win over the export for the same course. An emptied cell clears them.
 

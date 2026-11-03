@@ -22,6 +22,8 @@ export interface EditorCourse {
   credits: number;
   suggestedSemester: number;
   courseType: string;
+  /** map group (lib/courseCategory.ts), "" = derived from courseType */
+  category: string;
   isPlaceholder: boolean;
   placeholderKind: string;
   placeholderLabel: string;

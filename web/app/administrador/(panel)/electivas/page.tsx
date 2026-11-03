@@ -42,7 +42,7 @@ export default async function ElectivasPage() {
 
       <details className="admin-section" style={{ marginTop: 28 }}>
         <summary style={{ cursor: "pointer", fontWeight: 600 }}>
-          Diagrama de Venn para incrustar (Eléctrica · Electrónica)
+          Selector de electivas para incrustar (Eléctrica · Electrónica)
         </summary>
         <p className="admin-note">
           Página pública e incrustable en otros sitios. Se arma con esta bolsa: rol 2024-I+ de cada programa
@@ -57,7 +57,7 @@ export default async function ElectivasPage() {
         />
         <iframe
           src="/embed/electivas"
-          title="Vista previa del diagrama de Venn de electivas"
+          title="Vista previa del selector de electivas"
           style={{ width: "100%", height: 560, border: "1px solid #e5e7eb", borderRadius: 8, marginTop: 12 }}
         />
       </details>

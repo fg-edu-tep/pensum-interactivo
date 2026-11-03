@@ -57,6 +57,7 @@ function courseCreateData(
     credits: pc.credits ?? 0,
     suggestedSemester: pc.semester ?? 0,
     courseType: pc.courseType,
+    category: pc.category ?? null,
     isPlaceholder: pc.isPlaceholder,
     placeholderKind: pc.placeholderKind ?? null,
     placeholderLabel: pc.placeholderLabel ?? null,

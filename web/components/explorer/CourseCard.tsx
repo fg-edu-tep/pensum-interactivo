@@ -39,23 +39,28 @@ export interface CourseCardData {
   onHover: (id: string | null, rect?: DOMRect) => void;
 }
 
-/** Second channel for course type (shape, not just hue): Proyecto/CBU and
- * Otras/IELE sit close in colour at card size, and colour alone fails for
- * colour-blind users. 8×8, drawn in the card's secondary text colour. */
+/** Second channel for the group (shape, not just hue): some PDF colours sit
+ * close at card size, and colour alone fails for colour-blind users. 8×8,
+ * drawn in the card's secondary text colour. */
 export function TypeGlyph({ group }: { group: CourseGroup }) {
   const common = { width: 8, height: 8, viewBox: "0 0 8 8", "aria-hidden": true as const, className: styles.typeGlyph };
   switch (group) {
-    case "iele": // circle
+    case "obligatorio":
+    case "ftiee": // circle
       return <svg {...common}><circle cx="4" cy="4" r="3.5" fill="currentColor" /></svg>;
-    case "cb": // square
+    case "fesp": // square
       return <svg {...common}><rect x=".5" y=".5" width="7" height="7" fill="currentColor" /></svg>;
-    case "otr": // diamond
+    case "fing": // diamond
       return <svg {...common}><path d="M4 0 8 4 4 8 0 4z" fill="currentColor" /></svg>;
-    case "pro": // triangle
+    case "ciencias": // inverted triangle
+      return <svg {...common}><path d="M.2 .5h7.6L4 7.5z" fill="currentColor" /></svg>;
+    case "proyecto": // triangle
       return <svg {...common}><path d="M4 .5 7.8 7.5H.2z" fill="currentColor" /></svg>;
-    case "ele": // hollow ring
+    case "electiva":
+    case "terminal": // hollow ring
       return <svg {...common}><circle cx="4" cy="4" r="3" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>;
-    case "cbu": // half circle
+    case "cbu":
+    case "edugen": // half circle
       return (
         <svg {...common}>
           <circle cx="4" cy="4" r="3.25" fill="none" stroke="currentColor" strokeWidth="1" />

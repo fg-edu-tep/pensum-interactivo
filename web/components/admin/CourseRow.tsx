@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import DiscrepancyAlert from "./DiscrepancyAlert";
 import type { SyncedCourse } from "@/lib/pairing/syncCatalogCourses";
+import { CATEGORY_LABEL, CATEGORY_ORDER } from "@/lib/courseCategory";
 import {
   COURSE_TYPES,
   PAIRING_LABEL,
@@ -17,6 +18,7 @@ const LOCKABLE = [
   "credits",
   "suggestedSemester",
   "courseType",
+  "category",
   "placeholderLabel",
   "prereqText",
 ] as const;
@@ -36,6 +38,7 @@ export default function CourseRow({ slug, course, prevId, nextId }: Props) {
     credits: String(course.credits),
     suggestedSemester: String(course.suggestedSemester),
     courseType: course.courseType,
+    category: course.category,
     isPlaceholder: course.isPlaceholder,
     placeholderKind: course.placeholderKind,
     placeholderLabel: course.placeholderLabel,
@@ -53,6 +56,7 @@ export default function CourseRow({ slug, course, prevId, nextId }: Props) {
     credits: String(course.credits),
     suggestedSemester: String(course.suggestedSemester),
     courseType: course.courseType,
+    category: course.category,
     isPlaceholder: course.isPlaceholder,
     placeholderKind: course.placeholderKind,
     placeholderLabel: course.placeholderLabel,
@@ -88,6 +92,7 @@ export default function CourseRow({ slug, course, prevId, nextId }: Props) {
         if (f.suggestedSemester !== orig.suggestedSemester)
           body.suggestedSemester = Number(f.suggestedSemester);
         if (f.courseType !== orig.courseType) body.courseType = f.courseType;
+        if (f.category !== orig.category) body.category = f.category || null;
         if (f.isPlaceholder !== orig.isPlaceholder) body.isPlaceholder = f.isPlaceholder;
         if (f.placeholderKind !== orig.placeholderKind)
           body.placeholderKind = f.placeholderKind || null;
@@ -275,6 +280,24 @@ export default function CourseRow({ slug, course, prevId, nextId }: Props) {
           {COURSE_TYPES.map((t) => (
             <option key={t} value={t}>
               {t}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="er-field">
+        <span>
+          Grupo <Lock field="category" />
+        </span>
+        <select
+          className="admin-select"
+          value={f.category}
+          onChange={(e) => setF({ ...f, category: e.target.value })}
+          title="El grupo y color del curso en el mapa (columna TIPO del archivo PLANES)"
+        >
+          <option value="">(según el tipo)</option>
+          {CATEGORY_ORDER.map((c) => (
+            <option key={c} value={c}>
+              {CATEGORY_LABEL[c]}
             </option>
           ))}
         </select>

@@ -11,6 +11,7 @@ branch: claude/loving-edison-ftxjls
 status: en-revision
 release-gate: listo
 dsit-deploy: 2026-11-04
+updated: 2026-11-03
 aliases:
   - Changelog 2026-11-02
   - Carga oficial 202710
@@ -28,6 +29,8 @@ aliases:
 >
 > Also in this round: the electives widget (tags, program, two aligned columns, period), the "Planeación" page, Mauricio's two email grievances, and the smaller fixes (quick selection, Spanish writing requirement, CLE, contrast, loading veil, login).
 > Previous rounds: [[2026-10-29 Revisión con Mauricio]] · Engineering doc: [[admin-official-load]] · Spec: *Pensum IELE — Improvements from Review with Mauricio Guerrero (2026-10-29)*
+>
+> **Update 2026-11-03** (§10): a QA pass over every item of the spec, then the fixes it led to. The map's groups and colours now come from TIPO and the pensum PDF. The Mi avance filters are simpler, the cart button stays on screen, and the electives widget is now a summary bar plus a role matrix instead of the Venn diagram.
 
 > [!success] Verification
 > - `npm run test`: **229 ✅ · 0 ❌** (11 pre-existing skips).
@@ -99,6 +102,9 @@ What the 2027-1 load changed in the plans (vs. the old workbook):
 
 ## 4. Electives widget (§2)
 
+> [!note] Superseded on 2026-11-03
+> The rules below still hold, but the Venn circles were replaced by a summary bar and a role matrix. See §10.4.
+
 - [x] **Tags always visible:** "Electiva + Integrador", "Solo integrador", "Solo electiva", whatever the filter.
 - [x] **Program buttons:**
   - none selected = everything;
@@ -167,6 +173,76 @@ What the 2027-1 load changed in the plans (vs. the old workbook):
 
 ![planeacion](assets/2026-11-02/14-planeacion.png)
 
+## 10. Round of 2026-11-03: QA pass and fixes
+
+> [!success] QA pass (every item of the 2026-10-29 spec, in the browser)
+> - Ran on a local Postgres seeded from `datos/`, driving the app in a headless browser on the Electrónica con precálculo plan.
+> - **The three release gates pass.**
+>   - Gate 1: the amber warning appears before adding; the orange box tops checkout; a removed corequisite is flagged.
+>   - Gate 2: adding Cálculo vectorial outlines Ecuaciones diferenciales and Computación científica at once; removing it clears them.
+>   - Gate 3: all six layouts of the spec's table match in the UI, and so does the sequence 3, 2, 4, 1, 4, 1, 4.
+> - **Also passing:** loading veil, Spanish writing requirement, CLE, projected next offering, tags under every filter, and the two-column view with no red.
+> - **Kept by design:** a course not taught in the planning period can still go in the cart. Its requisites come from the history window in `PRERREQUISITOS`. The warning "Ojo: no has aprobado … Pensar, comunicar y colaborar" is also correct: that course is the requirement's name.
+
+### 10.1 Quick selection wording and the "unlocked" animation
+
+- [x] **Every way into quick selection asks "¿Qué semestres ya terminaste?"** Both the welcome option and the "Selección rápida" chooser used to say "dinos qué semestre vas a cursar". The welcome picker now reads "¿Qué semestres ya terminaste? Del I al…", so choosing III pre-marks I–III.
+- [x] **The "just unlocked" animation only lands on courses the map shows as available.** It used to play on courses that stayed blocked, such as Señales, Variable compleja and Fundamentos de electrónica. The cause was two different availability checks. Now the map and the animation share one status function. After marking I–III it plays on exactly the four courses that opened.
+
+![bienvenida semestres terminados](assets/2026-11-02/25-bienvenida-semestres-terminados.png)
+
+### 10.2 Map groups and colours from TIPO and the pensum PDF
+
+- [x] **The group comes from the `TIPO` column of PLANES,** for courses and slots alike. It accepts the four values the file uses today (Obligatorio, Proyecto, Electiva, CBU) **or the PDF's seven categories**: Fundamentos de Ingeniería, Fundamentos Transversales IEE, Fundamentos Específicos, Ciclo Terminal, Ciclo de Ciencias y Matemáticas, Proyectos, Educación General. Case and accents don't matter.
+- [x] **The legend and filter chips** list only the groups the plan has, with the file's names.
+- [x] **Colours are the PDF's,** darkened only as far as white text needs (≥ 5.5:1). Each group keeps a shape glyph as a second cue.
+  - Fundamentos de Ingeniería is **olive**: the PDF green at that darkness is the "aprobada" green, 1.11:1 apart.
+  - The generic "Obligatorio" keeps the app's teal.
+  - Electiva takes Ciclo Terminal's pink, and CBU takes Educación General's purple.
+- [x] **The importer warns** when a file mixes "Obligatorio" with PDF categories, because they would share a colour family on the map.
+- [x] **Editable in the admin:** the catalogue editor has a "Grupo" field, which can be pinned against re-imports.
+- [x] **Re-imports fill it in:** the plan diff updated about 270 rows with no conflicts, so no rebuild is needed.
+- [x] **Contrast test:** it also checks every group's secondary text (≥ 4.5:1) and that the olive stays apart from "aprobada".
+- [x] **Long legends wrap:** with seven names the toolbar wraps to two rows on desktop; on a phone it stays one row that scrolls sideways.
+
+![grupos desde tipo](assets/2026-11-02/26-grupos-desde-tipo.png)
+![grupos categorias pdf](assets/2026-11-02/27-grupos-categorias-pdf.png)
+
+*The second capture is a preview: one plan's TIPO was set to the PDF's categories in a test database.*
+
+### 10.3 Mi avance: status filters and the cart button
+
+- [x] **Status filters: Aprobadas · Disponibles · Canasta · Desbloqueadas con canasta.** "Regla administrativa" and "Bloqueadas" are gone.
+  - Nothing is selected by default.
+  - Tapping one or more filters lights up only those courses and dims the rest.
+  - "Desbloqueadas con canasta" covers what the cart opens this semester (by corequisite) or the next. With Cálculo vectorial in the cart it lights Señales, Variable compleja, Ecuaciones diferenciales and Computación científica.
+- [x] **"Revisar mi canasta" stays at the bottom left once the cart has something in it,** in Explorar and Mi avance, with a course open, in quick selection, and with the planner panel open.
+
+![filtros de estado](assets/2026-11-02/28-filtros-de-estado.png)
+![canasta siempre visible](assets/2026-11-02/29-canasta-siempre-visible.png)
+
+### 10.4 Electives widget: summary bar and role matrix
+
+The Venn diagram spent its whole area on 36 shared courses and couldn't show the electiva / integrador distinction. Four alternatives were prototyped on the real bag, and **A, a summary bar plus a role matrix,** was chosen.
+
+- [x] **Summary bar:** drawn to scale, and each part filters the list.
+  - With "Ambos" it splits by program: 36 in both · 1 solo Electrónica · 1 solo Eléctrica.
+  - With one program it splits by role: 29 solo electiva · 6 electiva + integrador · 2 solo integrador.
+- [x] **Role matrix:** one row per course, with ● electiva and ◆ integrador per program in the PDF's Ciclo Terminal pink.
+  - Where a course doesn't count, the program cell shows a dashed "no aplica", never red.
+  - The two courses that differ between programs come first, tinted. Then electiva + integrador, solo integrador, solo electiva.
+- [x] **"Se dicta" column:** green for K / K+1, amber for the projected period, grey for "por definir".
+- [x] **Kept from §4:** filters (Programa, Tipo, Se dicta en), search, inline detail and "Planear con esta materia". Existing links (`?programa=`, `?tipo=`, `?periodo=`) work unchanged.
+- [x] **Built for an iframe:** it reflows by its own width, with one card per course on a phone. Checked at 1100, 700 and 390 px with no sideways scroll. The admin page now calls it "Selector de electivas".
+
+![selector electivas](assets/2026-11-02/30-selector-electivas.png)
+![selector electivas celular](assets/2026-11-02/31-selector-electivas-celular.png)
+
+> [!success] Verification (2026-11-03)
+> - `npm run test`: **236 ✅ · 0 ❌** (12 skips need a scratch DB).
+> - `tsc --noEmit` ✅. `npm run build` ✅.
+> - New tests cover TIPO parsing (generic + PDF categories, the mixed-nomenclature warning, the golden PLANES), the role matrix (order, summary, search) and the contrast of every group colour.
+
 ---
 
 ## Questions for Mauricio
@@ -180,8 +256,8 @@ What the 2027-1 load changed in the plans (vs. the old workbook):
 > [!question] PROXIMO for courses taught in 2027-1
 > Robótica has a row in 2027-1 and PROXIMO = 202810. Taller de sistemas de potencia has a row in 2027-1 and PROXIMO = **202710**. We read PROXIMO as "the next projected offering" and show it as is. Should it always be the one **after** the planning period?
 
-> [!question] Colours of the pensum PDF
-> The Excels carry no colour, and we don't have the department's current pensum PDF. Can you send it so the classification colours and the legend match it exactly?
+> [!question] Colours of the pensum PDF (update 2026-11-03)
+> We now have the PDF (`ielc2026pc52`), and its colours are in the app (§10.2). The Excels still carry no classification, so the map shows TIPO's four groups. Can you write the PDF category of each course in the **TIPO** column of PLANES (for example "Fundamentos Transversales IEE")? Everything else follows on the next load.
 
 > [!question] EXMA1 / EXDO1
 > We show them as "ser estudiante de maestría / doctorado". Is that the right meaning?
@@ -191,7 +267,7 @@ What the 2027-1 load changed in the plans (vs. the old workbook):
 > - An amber warning (not red).
 > - An explicit "Electivas" filter.
 > - In the elective box, both "Agregar electiva sin especificar" and "the cart holds the course".
-> - The Venn keeps inline detail **and** the planner link.
+> - The electives widget keeps inline detail **and** the planner link. Since 2026-11-03 it is a summary bar plus a role matrix instead of the Venn (§10.4).
 
 > [!question] Master's plans and the Genially
 > MIELE/MIELC are loaded as drafts: publish them? And can you send the Genially link?
@@ -202,15 +278,17 @@ What the 2027-1 load changed in the plans (vs. the old workbook):
 - [ ] Answer: IELE-2110 projection
 - [ ] Answer: Taller IEE 1 restriction (15 or 30 cr)
 - [ ] Confirm: PROXIMO semantics
-- [ ] Send: pensum PDF (colours) and Genially link
+- [x] ~~Send: pensum PDF~~ (received 2026-11-03)
+- [ ] Fill: the PDF category in PLANES' TIPO column
+- [ ] Send: Genially link
 - [ ] Confirm: EXMA1 / EXDO1
 - [ ] Decide: proposals listed above, master's drafts, credit cap
 
 ## Deploy (DSIT 2026-11-04)
 
 > [!warning] Steps
-> 1. `npm run db:deploy`: new migration `official_load`, plus the two from the previous round if they are not applied yet.
-> 2. Either load the three files from **/administrador/carga** (choose 2027-1), or run `npm run seed` with them in `datos/`.
+> 1. `npm run db:deploy`: new migrations `official_load` and `catalog_course_category` (2026-11-03, one nullable column), plus the two from the previous round if they are not applied yet. The MySQL branch (`mysql-migration`) needs its own version of `catalog_course_category`.
+> 2. Either load the three files from **/administrador/carga** (choose 2027-1), or run `npm run seed` with them in `datos/`. Run it again on a server that already had the 2027-1 load, so the map groups come from TIPO; until then they are derived from the course type.
 > 3. Create Mauricio's account on that server: the first-time setup, or the super-panel.
 > 4. Optional: set `NEXT_PUBLIC_GENIALLY_URL` and `NEXT_PUBLIC_SITE_URL`.
 

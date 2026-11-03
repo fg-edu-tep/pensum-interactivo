@@ -28,6 +28,22 @@ test("classification and status colours reach 4.5:1 against white", () => {
   }
 });
 
+test("every group fill has a secondary text colour that reaches 4.5:1 on it", () => {
+  const hex = (name: string) => css.match(new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{6})`))?.[1];
+  for (const g of ["iele", "fing", "ftiee", "fesp", "ciencias", "otr", "pro", "ele", "cbu", "req"]) {
+    const fill = hex(`t-${g}`);
+    const second = hex(`on-type-2-${g}`);
+    assert.ok(fill && second, `--t-${g} / --on-type-2-${g}`);
+    const r = contrast(second, fill);
+    assert.ok(r >= 4.5, `--on-type-2-${g} ${second} on ${fill}: ${r.toFixed(2)}:1`);
+  }
+});
+
+test("Fundamentos de Ingeniería doesn't read as the 'aprobada' green", () => {
+  const hex = (name: string) => css.match(new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{6})`))![1];
+  assert.ok(contrast(hex("t-fing"), hex("st-ok")) >= 1.3);
+});
+
 test("the new warning colours (cart warnings, amber box) reach AA", () => {
   assert.ok(contrast("#78350f", "#fffbeb") >= 4.5);
   assert.ok(contrast("#7c2d12", "#fff7ed") >= 4.5);

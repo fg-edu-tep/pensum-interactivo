@@ -55,7 +55,7 @@ import QuickChooser from "./explorer/QuickChooser";
 import { BasketIcon } from "./explorer/icons";
 import { exploreSteps, avanceSteps, TOUR_INTRO, TOUR_LABEL, type TourKind } from "./explorer/tours";
 import SetupSheet from "./explorer/SetupSheet";
-import { groupOf, setPlanningTerm, toSentenceCase, type CourseGroup } from "./explorer/format";
+import { groupOf, groupsOf, setPlanningTerm, toSentenceCase, type CourseGroup } from "./explorer/format";
 import { termLabel } from "@/lib/term";
 import "./explorer/tokens.css";
 import styles from "./explorer/explorer.module.css";
@@ -125,7 +125,8 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
   // forward direction (what a course unlocks): a preference, OFF by default
   const [relView, setRelView] = useState<RelView>(DEFAULT_REL_VIEW);
   const [hiddenGroups, setHiddenGroups] = useState<Set<CourseGroup>>(new Set());
-  const [hiddenStatuses, setHiddenStatuses] = useState<Set<StatusFilter>>(new Set());
+  // Mi avance status chips: none chosen = the whole map; chosen = only those light up
+  const [activeStatuses, setActiveStatuses] = useState<Set<StatusFilter>>(new Set());
   const [quickMode, setQuickMode] = useState(false);
   const [staged, setStaged] = useState<Set<string>>(new Set());
   const [justUnlocked, setJustUnlocked] = useState<Set<string>>(new Set());
@@ -165,7 +166,7 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
   const [avanceTourDone, setAvanceTourDone] = useState(true);
   const [chooserOpen, setChooserOpen] = useState(false);
   const [welcomeOpen, setWelcomeOpen] = useState(false);
-  const [setupSemester, setSetupSemester] = useState<number | null>(null);
+  const [setupFinishedThrough, setSetupFinishedThrough] = useState<number | null>(null);
   const [basketOpen, setBasketOpen] = useState(false);
   const [basketFocusId, setBasketFocusId] = useState<string | null>(null);
   const [setupFirstTime, setSetupFirstTime] = useState(true);
@@ -370,6 +371,7 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
     return best ?? courses.find((c) => !c.isPlaceholder) ?? null;
   }, [courses]);
   const selectedCourse = useMemo(() => courses.find((c) => c.id === selectedId) ?? null, [courses, selectedId]);
+  const mapGroups = useMemo(() => groupsOf(courses), [courses]);
 
   const effectiveApproved = useMemo(() => {
     const extra = courses.filter((c) => c.requirementAttestationId && attestationsMet.has(c.requirementAttestationId));
@@ -409,37 +411,57 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
   // the same context with the REAL approved set (not the setup-sheet preview)
   const realPlanCtx = useMemo<PlanContext>(() => ({ ...planCtx, approved: effectiveApproved }), [planCtx, effectiveApproved]);
   // elective slots: enabled when one of their courses can be taken now
-  const slotOpen = useMemo(
-    () =>
+  const slotsFor = useCallback(
+    (approvedSet: Set<string>, approvedCredits: number) =>
       slotOpenMap(courses, data.electives, data.catalog.programCode, {
-        approved: statusApprovedSet,
+        approved: approvedSet,
         cart: plannedSet,
         catalogCodes,
-        approvedCredits: plan.creditsA,
+        approvedCredits,
         pregrado: takesPregradoDefaults(data.catalog),
         programCode: data.catalog.programCode,
         pensumCodes: catalogCodes,
       }),
-    [courses, data.electives, data.catalog.programCode, statusApprovedSet, plannedSet, catalogCodes, plan.creditsA]
+    [courses, data.electives, data.catalog, plannedSet, catalogCodes]
   );
+  const slotOpen = useMemo(() => slotsFor(statusApprovedSet, plan.creditsA), [slotsFor, statusApprovedSet, plan.creditsA]);
 
-  const { statusById, lockedIds } = useMemo(() => {
-    const statusById = new Map<string, AvailabilityStatus>();
-    const lockedIds = new Set<string>();
-    for (const c of courses) {
-      // Mi avance is two-state for the student (variant A of F-6)
-      const s = plan.stateIgnoringCart(c);
-      statusById.set(c.id, s === "approved" ? "approved" : s === "now" ? "available" : "blocked");
-      if (s !== "approved" && plan.now(c).gateReasons.length > 0) lockedIds.add(c.id);
-    }
-    for (const [id, open] of slotOpen) if (!open && statusById.get(id) !== "approved") statusById.set(id, "blocked");
-    // a box filled by bag courses reads as seen when all of them are
-    for (const b of boxIds) {
-      const occ = occupantsOf(b);
-      if (occ.length && occ.every((k) => statusApprovedSet.has(bagCourseId(k)))) statusById.set(b, "approved");
-    }
-    return { statusById, lockedIds };
-  }, [courses, plan, slotOpen, boxIds, occupantsOf, statusApprovedSet]);
+  // The map's status for a given approved set. The map and the "se
+  // desbloquearon" animation both read it, so the animation never lands on a
+  // card the map still draws as blocked.
+  const statusFor = useCallback(
+    (approvedSet: Set<string>, pl = planner({ ...planCtx, approved: approvedSet }), slots = slotsFor(approvedSet, pl.creditsA)) => {
+      const statusById = new Map<string, AvailabilityStatus>();
+      const lockedIds = new Set<string>();
+      for (const c of courses) {
+        // Mi avance is two-state for the student (variant A of F-6)
+        const s = pl.stateIgnoringCart(c);
+        statusById.set(c.id, s === "approved" ? "approved" : s === "now" ? "available" : "blocked");
+        if (s !== "approved" && pl.now(c).gateReasons.length > 0) lockedIds.add(c.id);
+      }
+      for (const [id, open] of slots) if (!open && statusById.get(id) !== "approved") statusById.set(id, "blocked");
+      // a box filled by bag courses reads as seen when all of them are
+      for (const b of boxIds) {
+        const occ = occupantsOf(b);
+        if (occ.length && occ.every((k) => approvedSet.has(bagCourseId(k)))) statusById.set(b, "approved");
+      }
+      return { statusById, lockedIds };
+    },
+    [courses, planCtx, slotsFor, boxIds, occupantsOf]
+  );
+  const { statusById, lockedIds } = useMemo(
+    () => statusFor(statusApprovedSet, plan, slotOpen),
+    [statusFor, statusApprovedSet, plan, slotOpen]
+  );
+  /** cards that turn "available" on the map going from the real approved set to `nextEffective` */
+  const unlockedBy = useCallback(
+    (nextEffective: Set<string>) => {
+      const before = statusFor(effectiveApproved).statusById;
+      const after = statusFor(nextEffective).statusById;
+      return new Set([...after].filter(([id, s]) => s === "available" && before.get(id) !== "available").map(([id]) => id));
+    },
+    [statusFor, effectiveApproved]
+  );
   // the map's "en tu canasta" state: a box is planned when a course in it is
   const plannedForMap = useMemo(() => {
     const m = new Map(planned);
@@ -450,11 +472,39 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
     return m;
   }, [planned, boxIds, occupantsOf]);
 
+  // checkout step 0 (lib/planning.ts): same-semester (by corequisite) and
+  // next-semester courses for the current cart
+  const zero = useMemo(() => (planned.size === 0 ? { sameSemester: [], nextSemester: [] } : stepZero(realPlanCtx)), [planned.size, realPlanCtx]);
+
+  // "La vas a poder ver" markers: recomputed on EVERY cart change (agreed
+  // 2026-10-29, release gate 2) — adding Computación científica marks
+  // Optimización at once, removing it clears the mark. Only an annotation:
+  // nothing is ever added for the student. Step 0 stays as the summary.
+  const nextIds = useMemo(() => new Set(zero.nextSemester.map((x) => x.course.id)), [zero]);
+  // "Desbloqueadas con canasta": what the cart opens, now (by corequisite) or next semester
+  const unlockedByCart = useMemo(
+    () => new Set([...zero.sameSemester, ...zero.nextSemester].map((x) => x.course.id).filter((id) => !planned.has(id))),
+    [zero, planned]
+  );
+  /** which Mi avance filter chips a course answers to (they overlap: a cart course may also be available) */
+  const statusMembers = useCallback(
+    (id: string): StatusFilter[] => {
+      const out: StatusFilter[] = [];
+      const s = statusById.get(id);
+      if (s === "approved") out.push("approved");
+      if (plannedForMap.has(id)) out.push("cart");
+      else if (s === "available") out.push("available");
+      if (unlockedByCart.has(id)) out.push("unlocked");
+      return out;
+    },
+    [statusById, plannedForMap, unlockedByCart]
+  );
+
   const matchedIds = useMemo(() => {
     const q = query.trim().toLowerCase();
     const hasQuery = q.length > 0;
     const hasGroupFilter = mode === "explore" && hiddenGroups.size > 0;
-    const hasStatusFilter = mode === "progress" && hiddenStatuses.size > 0;
+    const hasStatusFilter = mode === "progress" && activeStatuses.size > 0;
     if (!hasQuery && !hasGroupFilter && !hasStatusFilter) return null;
 
     const set = new Set<string>();
@@ -464,15 +514,12 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
         if (!hit) continue;
       }
       if (hasGroupFilter && hiddenGroups.has(groupOf(c))) continue;
-      if (hasStatusFilter) {
-        const status = statusById.get(c.id);
-        const asFilter: StatusFilter | null = lockedIds.has(c.id) ? "admin" : (status as StatusFilter) ?? null;
-        if (asFilter && hiddenStatuses.has(asFilter)) continue;
-      }
+      // status chips focus: only the courses in one of the chosen states stay lit
+      if (hasStatusFilter && !statusMembers(c.id).some((m) => activeStatuses.has(m))) continue;
       set.add(c.id);
     }
     return set;
-  }, [courses, query, mode, hiddenGroups, hiddenStatuses, statusById, lockedIds]);
+  }, [courses, query, mode, hiddenGroups, activeStatuses, statusMembers]);
 
   const selectedAvailability = useMemo(() => {
     if (!selectedCourse) return null;
@@ -529,28 +576,14 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
   }, [courses, selectedCourse, relaciones]);
 
   const statusCounts = useMemo(() => {
-    const out: Record<StatusFilter, number> = { approved: 0, available: 0, "one-away": 0, blocked: 0, admin: 0 };
+    const out: Record<StatusFilter, number> = { approved: 0, available: 0, cart: 0, unlocked: 0 };
     for (const c of courses) {
-      if (c.isPlaceholder) continue;
-      if (lockedIds.has(c.id)) {
-        out.admin += 1;
-        continue;
-      }
-      const s = statusById.get(c.id);
-      if (s) out[s === "one-away" ? "blocked" : (s as StatusFilter)] += 1;
+      if (c.isPlaceholder && !plannedForMap.has(c.id)) continue;
+      for (const m of statusMembers(c.id)) out[m] += 1;
     }
     return out;
-  }, [courses, statusById, lockedIds]);
+  }, [courses, plannedForMap, statusMembers]);
 
-  // checkout step 0 (lib/planning.ts): same-semester (by corequisite) and
-  // next-semester courses for the current cart
-  const zero = useMemo(() => (planned.size === 0 ? { sameSemester: [], nextSemester: [] } : stepZero(realPlanCtx)), [planned.size, realPlanCtx]);
-
-  // "La vas a poder ver" markers: recomputed on EVERY cart change (agreed
-  // 2026-10-29, release gate 2) — adding Computación científica marks
-  // Optimización at once, removing it clears the mark. Only an annotation:
-  // nothing is ever added for the student. Step 0 stays as the summary.
-  const nextIds = useMemo(() => new Set(zero.nextSemester.map((x) => x.course.id)), [zero]);
   const handleStepZeroShown = useCallback(() => {}, []);
   // cart courses added without their requirements (release gate 1)
   const warnings = useMemo(() => (planned.size === 0 ? [] : cartWarnings(realPlanCtx)), [planned.size, realPlanCtx]);
@@ -673,20 +706,13 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
     setSelectedId(null);
     setPanelOpen(false);
     setSetupFirstTime(false);
-    setSetupSemester(null);
+    setSetupFinishedThrough(null);
     setSetupOpen(true);
   }, []);
 
   const handleQuickFinish = useCallback(() => {
     const nextApproved = new Set([...approved, ...staged]);
-    const nextEffective = new Set([...effectiveApproved, ...staged]);
-    const unlocked = new Set<string>();
-    for (const c of courses) {
-      if (nextEffective.has(c.id)) continue;
-      if (statusById.get(c.id) === "available") continue;
-      const now = courseAvailability(c, nextEffective, catalogCodes, courses, ruleCtx).status;
-      if (now === "available") unlocked.add(c.id);
-    }
+    const unlocked = unlockedBy(new Set([...effectiveApproved, ...staged]));
     setApproved(nextApproved);
     setStaged(new Set());
     setQuickMode(false);
@@ -700,7 +726,7 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
     } else {
       setJustUnlocked(new Set());
     }
-  }, [approved, effectiveApproved, staged, courses, statusById, catalogCodes, ruleCtx]);
+  }, [approved, effectiveApproved, staged, courses, unlockedBy]);
 
   useEffect(() => () => { if (unlockTimer.current) clearTimeout(unlockTimer.current); }, []);
 
@@ -815,7 +841,7 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
     });
   }
   function handleToggleStatus(s: StatusFilter) {
-    setHiddenStatuses((prev) => {
+    setActiveStatuses((prev) => {
       const next = new Set(prev);
       next.has(s) ? next.delete(s) : next.add(s);
       return next;
@@ -936,13 +962,7 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
       for (const id of ids) nextApproved.add(id);
       const nextEffective = new Set([...[...effectiveApproved].filter((id) => !dropped.includes(id)), ...ids]);
       setQuickMarked(selection);
-      const unlocked = new Set<string>();
-      for (const c of courses) {
-        if (nextEffective.has(c.id)) continue;
-        if (statusById.get(c.id) === "available") continue;
-        const now = courseAvailability(c, nextEffective, catalogCodes, courses, ruleCtx).status;
-        if (now === "available") unlocked.add(c.id);
-      }
+      const unlocked = unlockedBy(nextEffective);
       setApproved(nextApproved);
       markSetupSeen();
       if (unlockTimer.current) clearTimeout(unlockTimer.current);
@@ -951,7 +971,7 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
         unlockTimer.current = setTimeout(() => setJustUnlocked(new Set()), 5600);
       }
     },
-    [approved, effectiveApproved, courses, statusById, catalogCodes, ruleCtx, markSetupSeen, quickMarked, setQuickMarked]
+    [approved, effectiveApproved, unlockedBy, markSetupSeen, quickMarked, setQuickMarked]
   );
 
   return (
@@ -987,13 +1007,14 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
 
       <Toolbar
         mode={mode}
+        groups={mapGroups}
         hiddenGroups={hiddenGroups}
         onToggleGroup={handleToggleGroup}
         relaciones={relaciones}
         unlockView={deriveUnlockView(relView)}
         onRelacionesChange={setRelaciones}
         statusCounts={statusCounts}
-        hiddenStatuses={hiddenStatuses}
+        activeStatuses={activeStatuses}
         onToggleStatus={handleToggleStatus}
         quickMode={quickMode}
         onQuickToggle={handleQuickToggle}
@@ -1110,7 +1131,9 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
           />
         )}
 
-        {mode === "progress" && !quickMode && !setupOpen && !showPlanner && (
+        {/* with something in the cart it stays put in every mode and panel;
+            empty, it only stands in for the planner panel when that's closed */}
+        {(planned.size > 0 || (mode === "progress" && !quickMode && !setupOpen && !showPlanner)) && (
           <button
             type="button"
             className={styles.basketFab}
@@ -1152,9 +1175,9 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
           <AvanceWelcome
             courses={courses}
             onStartFresh={closeWelcome}
-            onPickSemester={(n) => {
+            onPickFinished={(n) => {
               closeWelcome();
-              setSetupSemester(n);
+              setSetupFinishedThrough(n);
               setSetupFirstTime(true);
               setSetupOpen(true);
             }}
@@ -1238,7 +1261,7 @@ export default function PensumExplorer({ data, mihorarioUrl }: Props) {
               onBlank={markSetupSeen}
               onPreviewChange={setSetupPreviewIds}
               firstTime={setupFirstTime}
-              initialSemester={setupSemester}
+              initialFinishedThrough={setupFinishedThrough}
               onUseTool={() => {
                 setSetupSeen(true);
                 setSetupOpen(false);

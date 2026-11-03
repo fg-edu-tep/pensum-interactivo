@@ -10,6 +10,7 @@ import { ENGLISH_REQ_CODE_RE, LEGACY_ENGLISH_REQ_CODE_SOURCE } from "./types";
 import { parseRequirement } from "./import/requirementParser";
 import { sortCatalogs } from "./catalogOrder";
 import { withRuleDefaults } from "./creditUnlocks";
+import { isCourseCategory } from "./courseCategory";
 import type {
   CatalogPayload,
   CatalogRules,
@@ -144,6 +145,7 @@ export async function buildCatalogPayload(slug: string): Promise<CatalogPayload 
       credits: cc.credits,
       semester: cc.suggestedSemester,
       type: cc.courseType as Course["type"],
+      category: isCourseCategory(cc.category) ? cc.category : null,
       isPlaceholder: cc.isPlaceholder,
       placeholderKind: cc.placeholderKind,
       placeholderLabel: cc.placeholderLabel,

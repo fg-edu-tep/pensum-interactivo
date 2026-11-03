@@ -18,11 +18,11 @@ interface Props {
   firstTime?: boolean;
   /** switch to the click-each-course selection tool */
   onUseTool?: () => void;
-  /** semester chosen in the welcome modal; otherwise NOTHING is preselected */
-  initialSemester?: number | null;
+  /** last finished semester chosen in the welcome modal; otherwise NOTHING is preselected */
+  initialFinishedThrough?: number | null;
 }
 
-export default function SetupSheet({ courses, approved, onConfirm, onSkip, onBlank, onPreviewChange, firstTime = true, onUseTool, initialSemester = null }: Props) {
+export default function SetupSheet({ courses, approved, onConfirm, onSkip, onBlank, onPreviewChange, firstTime = true, onUseTool, initialFinishedThrough = null }: Props) {
   const maxSemester = useMemo(
     () => Math.max(1, ...courses.filter((c) => !c.isPlaceholder).map((c) => c.semester)),
     [courses]
@@ -30,9 +30,9 @@ export default function SetupSheet({ courses, approved, onConfirm, onSkip, onBla
   // "¿Qué semestres ya terminaste?" (2026-10-29): toggles per semester —
   // non-contiguous allowed (double program, irregular students) — plus a
   // "del I al N" shortcut. Nothing is preselected unless the welcome screen
-  // passed "I'm about to take semester n" (= finished I … n-1).
+  // passed "I finished I … n".
   const [done, setDone] = useState<Set<number>>(
-    () => new Set(initialSemester && initialSemester > 1 ? Array.from({ length: initialSemester - 1 }, (_, i) => i + 1) : [])
+    () => new Set(initialFinishedThrough && initialFinishedThrough > 0 ? Array.from({ length: initialFinishedThrough }, (_, i) => i + 1) : [])
   );
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
   const semesters = useMemo(() => [...done].sort((a, b) => a - b), [done]);

@@ -282,15 +282,17 @@
 }
 
 /* ---------- 4. Toolbar ---------- */
+/* grows to a second row when the legend is long (the PDF's seven groups) */
 .toolbar {
-  height: 48px;
+  min-height: 48px;
   flex-shrink: 0;
   background: var(--surface);
   border-bottom: 1px solid var(--line);
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 20px;
+  padding: 6px 20px;
+  box-sizing: border-box;
   overflow-x: auto;
 }
 
@@ -299,6 +301,11 @@
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
+  min-width: 0;
+}
+/* on a phone the map needs the height: one row that scrolls sideways */
+@media (max-width: 760px) {
+  .chipRow { flex-wrap: nowrap; }
 }
 .chip {
   height: 30px;
@@ -717,10 +724,13 @@
   box-shadow: 0 0 0 2px var(--ring-gap), 0 0 0 4px var(--ink);
 }
 
-.typeIele { --card-color: var(--t-iele); --on-type-2: var(--on-type-2-iele); }
-.typeCb { --card-color: var(--t-cb); --on-type-2: var(--on-type-2-cb); }
-.typeOtr { --card-color: var(--t-otr); --on-type-2: var(--on-type-2-otr); }
-.typePro { --card-color: var(--t-pro); --on-type-2: var(--on-type-2-pro); }
+/* map groups (components/explorer/format.ts groupClass) */
+.catObligatorio { --card-color: var(--t-iele); --on-type-2: var(--on-type-2-iele); }
+.catFing { --card-color: var(--t-fing); --on-type-2: var(--on-type-2-fing); }
+.catFtiee { --card-color: var(--t-ftiee); --on-type-2: var(--on-type-2-ftiee); }
+.catFesp { --card-color: var(--t-fesp); --on-type-2: var(--on-type-2-fesp); }
+.catCiencias { --card-color: var(--t-ciencias); --on-type-2: var(--on-type-2-ciencias); }
+.catProyecto { --card-color: var(--t-pro); --on-type-2: var(--on-type-2-pro); }
 
 .cardTop {
   display: flex;
@@ -783,8 +793,8 @@
   border-radius: calc(var(--card-r) - 3px);
   pointer-events: none;
 }
-.slotEle { --card-color: var(--t-ele); --on-type-2: var(--on-type-2-ele); }
-.slotCbu { --card-color: var(--t-cbu); --on-type-2: var(--on-type-2-cbu); }
+.catTerminal { --card-color: var(--t-ele); --on-type-2: var(--on-type-2-ele); }
+.catEdugen { --card-color: var(--t-cbu); --on-type-2: var(--on-type-2-cbu); }
 .slotReq { --card-color: var(--t-req); --on-type-2: var(--on-type-2-req); }
 
 .numberBadge {
@@ -2690,8 +2700,11 @@
 .stSw { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; box-sizing: border-box; }
 .swApproved { background: var(--st-ok); border-radius: 999px; }
 .swAvailable { border: 1.5px solid var(--ink-2); border-radius: 999px; }
-.swBlocked { background: repeating-linear-gradient(135deg, var(--st-blocked-a) 0 2px, var(--st-blocked-b) 2px 4px); border: 1px solid var(--line-control); }
-.swAdmin { background: var(--st-warn); border-radius: 999px; }
+/* the cart pill and the "la vas a poder ver" ring, as drawn on the cards */
+.swCart { background: var(--st-plan); border-radius: 3px; }
+.swUnlocked { border: 2px solid var(--st-plan); border-radius: 3px; }
+/* a chosen focus filter */
+.chip.chipOn { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); color: var(--ink); }
 
 /* ---------- Welcome to Mi avance ---------- */
 .awBackdrop {

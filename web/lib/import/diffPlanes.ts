@@ -16,6 +16,7 @@ interface DbCourseRow {
   credits: number;
   suggestedSemester: number;
   courseType: string;
+  category: string | null;
   isPlaceholder: boolean;
   placeholderKind: string | null;
   placeholderLabel: string | null;
@@ -185,6 +186,8 @@ export async function buildPlanesDiff(
         ["suggestedSemester", dc.suggestedSemester, pc.semester],
         ["courseType", dc.courseType, pc.courseType],
         ["placeholderLabel", dc.placeholderLabel, pc.placeholderLabel ?? null],
+        // only the official file has TIPO; the coordinator template leaves it alone
+        ...(pc.category !== undefined ? ([["category", dc.category, pc.category]] as [string, unknown, unknown][]) : []),
       ];
       for (const [f, before, after] of consider) {
         if (after == null && f === "suggestedSemester") continue; // missing sem -> warning already

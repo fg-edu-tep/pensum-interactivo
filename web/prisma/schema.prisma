@@ -114,6 +114,8 @@ model CatalogCourse {
   credits           Float
   suggestedSemester Int
   courseType        String // nucleo|electiva|cbu|complementaria|proyecto
+  /// map group from PLANES' TIPO (lib/courseCategory.ts); null = derived from courseType
+  category          String?
   isPlaceholder     Boolean @default(false)
   placeholderKind   String? // CBU|ELECTIVA|EFI|CLE|DEPT|CODEX|CI
   placeholderLabel  String?

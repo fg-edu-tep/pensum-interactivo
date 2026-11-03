@@ -81,7 +81,7 @@ State is composed from independent classes on the same button:
 
 | Layer | Classes | Look |
 |---|---|---|
-| Type | `.typeIele`, `.typeCb`, … `.slot*` | Sets `--card-color` (the fill). Placeholder/slot cards use the same solid card — only the color differs — so every node clicks and reads the same. |
+| Group | `.catObligatorio`, `.catFtiee`, … `.slotReq` (format.ts `groupClass`) | Sets `--card-color` (the fill). Placeholder/slot cards use the same solid card — only the color differs — so every node clicks and reads the same. |
 | Selection relation | `.selected`, `.directPrereq`, `.chainIndirectFull`, `.unlockSole`, `.unlockAmong` | Rings via `box-shadow` (`--ring-gap` + colored ring). Selected is the only card with a 5 px accent ring, drop shadow and 2 px lift (F-3). Green ring = this is the only thing missing for a course; amber = one of several. |
 | Dimming | `.dimmed`, `.unrelated` | Unrelated cards fade (opacity ≈ 0.15–0.34) while a course is selected. |
 | Mi avance | `.stApproved`, `.stBlocked`, `.stAdmin`, `.tag`, `.staged` | Approved = green fill + 20 px check. In the basket = term pill on the top edge. Blocked = hatched grey with muted text (readable without hue). Admin-locked = hatched + amber lock marker. Available = no mark. |

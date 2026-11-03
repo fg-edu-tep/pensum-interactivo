@@ -76,3 +76,30 @@ test("filters: integradores keeps tags (Electiva + Integrador still says so), pe
   assert.deepEqual(p.map((r) => r.e.name).sort(), ["Digitalización", "Robótica"]);
   assert.equal(vennCounts(list, "todas", null).get(VENN_ELE | VENN_ELC), 3);
 });
+
+// ---- role matrix ----
+import { matrixBase, matrixSummary } from "./electiveVenn";
+
+test("matrix, both programs: the course that differs comes first; bar = 3 in both · 1 solo Electrónica · 0 solo Eléctrica", () => {
+  const rows = matrixBase(list, { program: "ambos", type: "todas", term: null });
+  assert.equal(rows[0].e.name, "Electrónica de potencia");
+  assert.equal(rows[0].ele, null);
+  assert.deepEqual(matrixSummary(rows, "ambos").map((p) => p.count), [3, 1, 0]);
+  // then electiva + integrador, solo integrador, solo electiva
+  assert.deepEqual(rows.slice(1).map((r) => r.e.name), ["Digitalización", "Práctica profesional", "Robótica"]);
+});
+
+test("matrix, one program: the bar splits by role; type and period filter, tags stay whole", () => {
+  const rows = matrixBase(list, { program: "ele", type: "todas", term: null });
+  assert.deepEqual(matrixSummary(rows, "ele"), [{ part: "e", count: 1 }, { part: "ei", count: 1 }, { part: "i", count: 1 }]);
+  const integ = matrixBase(list, { program: "ele", type: "integradores", term: null });
+  assert.deepEqual(integ.find((r) => r.e.name === "Digitalización")!.ele, { electiva: true, integrador: true });
+  assert.equal(matrixBase(list, { program: "elc", type: "todas", term: "202710" }).length, 3);
+});
+
+test("matrix search ignores accents and matches 'IELE 3338' style codes", () => {
+  const withCode = toVennElectives([row({ id: 9, name: "Robótica", code: "IELE3338", attrs: { IELE: { electiva: true }, IELC: { electiva: true } }, offeredTerms: [] })]);
+  assert.equal(matrixBase(withCode, { program: "ambos", type: "todas", term: null, query: "robotica" }).length, 1);
+  assert.equal(matrixBase(withCode, { program: "ambos", type: "todas", term: null, query: "iele 3338" }).length, 1);
+  assert.equal(matrixBase(withCode, { program: "ambos", type: "todas", term: null, query: "potencia" }).length, 0);
+});

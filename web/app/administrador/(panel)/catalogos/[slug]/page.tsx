@@ -76,6 +76,7 @@ export default async function CatalogEditorPage({
       credits: c.credits,
       suggestedSemester: c.suggestedSemester,
       courseType: c.courseType,
+      category: c.category ?? "",
       isPlaceholder: c.isPlaceholder,
       placeholderKind: c.placeholderKind ?? "",
       placeholderLabel: c.placeholderLabel ?? "",

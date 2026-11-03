@@ -6,39 +6,34 @@ import styles from "./explorer.module.css";
 import type { RelacionesMode } from "./MapCanvas";
 import type { UnlockView } from "./UnlockViewControl";
 
-const EXPLORE_GROUPS: { group: CourseGroup; dashed: boolean }[] = [
-  { group: "iele", dashed: false },
-  { group: "cb", dashed: false },
-  { group: "otr", dashed: false },
-  { group: "pro", dashed: false },
-  { group: "ele", dashed: true },
-  { group: "cbu", dashed: true },
-];
-
-export type StatusFilter = "approved" | "available" | "one-away" | "blocked" | "admin";
+/** Mi avance focus filters. They overlap (a cart course may also be available)
+ * and needn't cover every course: blocked ones match none. */
+export type StatusFilter = "approved" | "available" | "cart" | "unlocked";
 const SWATCH_CLASS: Record<StatusFilter, string> = {
   approved: "swApproved",
   available: "swAvailable",
-  "one-away": "swAvailable",
-  blocked: "swBlocked",
-  admin: "swAdmin",
+  cart: "swCart",
+  unlocked: "swUnlocked",
 };
-const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
-  { key: "approved", label: "Aprobadas" },
-  { key: "available", label: "Disponibles" },
-  { key: "blocked", label: "Bloqueadas" },
-  { key: "admin", label: "Regla administrativa" },
+const STATUS_FILTERS: { key: StatusFilter; label: string; hint: string }[] = [
+  { key: "approved", label: "Aprobadas", hint: "Lo que ya marcaste como visto" },
+  { key: "available", label: "Disponibles", hint: "Lo que puedes inscribir ya" },
+  { key: "cart", label: "Canasta", hint: "Lo que tienes en tu canasta" },
+  { key: "unlocked", label: "Desbloqueadas con canasta", hint: "Lo que tu canasta te abre, este semestre o el próximo" },
 ];
 
 interface Props {
   mode: "explore" | "progress";
+  /** the plan's groups (format.ts groupsOf): the legend and its filters */
+  groups: { group: CourseGroup; dashed: boolean }[];
   hiddenGroups: Set<CourseGroup>;
   onToggleGroup: (g: CourseGroup) => void;
   relaciones: RelacionesMode;
   onRelacionesChange: (r: RelacionesMode) => void;
   unlockView: UnlockView;
   statusCounts: Record<StatusFilter, number>;
-  hiddenStatuses: Set<StatusFilter>;
+  /** chosen focus filters; none = the whole map */
+  activeStatuses: Set<StatusFilter>;
   onToggleStatus: (s: StatusFilter) => void;
   quickMode: boolean;
   onQuickToggle: () => void;
@@ -47,13 +42,14 @@ interface Props {
 
 export default function Toolbar({
   mode,
+  groups,
   hiddenGroups,
   onToggleGroup,
   relaciones,
   onRelacionesChange,
   unlockView,
   statusCounts,
-  hiddenStatuses,
+  activeStatuses,
   onToggleStatus,
   quickMode,
   onQuickToggle,
@@ -64,7 +60,7 @@ export default function Toolbar({
       <div className={styles.toolbar}>
         <span className={styles.lbl}>Mostrar</span>
         <div className={styles.chipRow} data-tour="groups">
-          {EXPLORE_GROUPS.map(({ group, dashed }) => {
+          {groups.map(({ group, dashed }) => {
             const off = hiddenGroups.has(group);
             return (
               <button
@@ -150,14 +146,17 @@ export default function Toolbar({
     <div className={styles.toolbar}>
       <span className={styles.lbl}>Estado</span>
       <div className={styles.chipRow} data-tour="status">
-        {STATUS_FILTERS.map(({ key, label }) => {
-          const off = hiddenStatuses.has(key);
+        {STATUS_FILTERS.map(({ key, label, hint }) => {
+          const on = activeStatuses.has(key);
+          // with a filter chosen, the others read as "not shown"
+          const off = activeStatuses.size > 0 && !on;
           return (
             <button
               key={key}
               type="button"
-              className={`${styles.chip} ${off ? styles.off : ""}`}
-              aria-pressed={!off}
+              className={`${styles.chip} ${off ? styles.off : ""} ${on ? styles.chipOn : ""}`}
+              aria-pressed={on}
+              title={`${hint}. Tócalo para ver solo esos cursos.`}
               onClick={() => onToggleStatus(key)}
             >
               <span className={`${styles.stSw} ${styles[SWATCH_CLASS[key]]}`} aria-hidden />

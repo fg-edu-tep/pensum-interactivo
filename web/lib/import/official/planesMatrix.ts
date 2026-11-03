@@ -20,6 +20,7 @@ import * as XLSX from "xlsx";
 import type { CourseType } from "../../types";
 import { normalizeCode } from "../normalizeCode";
 import { foldAccents } from "../textMatch";
+import { CATEGORY_LABEL, GENERIC_CATEGORIES, courseTypeOfCategory, parseCategory, type CourseCategory } from "../../courseCategory";
 import type { PlaceholderKind } from "../classifyPlaceholder";
 import type { ParsedCatalogMeta, ParsedPlanCourse, ParsedPlanesWorkbook } from "../parsePlanesWorkbook";
 
@@ -217,11 +218,15 @@ export function parsePlanesMatrix(buffer: Buffer | ArrayBuffer | XLSX.WorkBook):
 
   const courses: Record<string, ParsedPlanCourse[]> = {};
   for (const p of plans) courses[p.slug] = [];
+  const categoriesSeen = new Set<CourseCategory>();
   for (const x of rows) {
     if (isCompanion(x.code, x.name, x.credits)) continue;
     const spec = slotSpec(x.code, x.name);
-    const typeFromFile = TIPO[foldAccents(x.tipo).toUpperCase()];
-    if (x.tipo && !typeFromFile) warnings.push(`Fila ${x.rowNum} (${x.code}): TIPO "${x.tipo}" desconocido — se usa el tipo por defecto.`);
+    // TIPO is the map group: the four generic values or the PDF's categories
+    const category = parseCategory(x.tipo);
+    const typeFromFile = TIPO[foldAccents(x.tipo).toUpperCase()] ?? (category ? courseTypeOfCategory(category) : undefined);
+    if (x.tipo && !category) warnings.push(`Fila ${x.rowNum} (${x.code}): TIPO "${x.tipo}" desconocido — se usa el tipo por defecto.`);
+    if (category) categoriesSeen.add(category);
     for (const p of plans) {
       const semester = x.semesters[p.slug];
       if (semester == null) continue;
@@ -244,6 +249,7 @@ export function parsePlanesMatrix(buffer: Buffer | ArrayBuffer | XLSX.WorkBook):
             name: spec.name,
             credits,
             courseType: spec.kind === "CLE" ? "complementaria" : spec.courseType,
+            category,
             isPlaceholder: true,
             placeholderKind: spec.kind,
             placeholderLabel: spec.name,
@@ -263,6 +269,7 @@ export function parsePlanesMatrix(buffer: Buffer | ArrayBuffer | XLSX.WorkBook):
         name: x.name || x.code,
         credits: x.credits,
         courseType: typeFromFile ?? (/PROYECTO/i.test(x.name) ? "proyecto" : "nucleo"),
+        category,
         isPlaceholder: false,
         prereqText: x.prereqText,
         coreqText: x.coreqText,
@@ -270,6 +277,14 @@ export function parsePlanesMatrix(buffer: Buffer | ArrayBuffer | XLSX.WorkBook):
       });
     }
   }
+  // the generic Obligatorio shares the PDF teal family: mixing it with the PDF
+  // categories makes the map ambiguous
+  const cats = [...categoriesSeen];
+  if (cats.some((c) => c === "obligatorio") && cats.some((c) => !GENERIC_CATEGORIES.has(c)))
+    warnings.push(
+      `TIPO mezcla "Obligatorio" con categorías del PDF (${cats.filter((c) => !GENERIC_CATEGORIES.has(c)).map((c) => CATEGORY_LABEL[c]).join(", ")}): usa una sola nomenclatura para que los colores del mapa se distingan.`
+    );
+
   // stable order: semester, then file row order (already)
   for (const slug of Object.keys(courses)) courses[slug].sort((a, b) => (a.semester ?? 0) - (b.semester ?? 0) || a.rowNum - b.rowNum);
 

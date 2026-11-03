@@ -133,6 +133,7 @@ export async function applyOfficialJob(jobId: number, opts: OfficialApplyOptions
       credits: c.credits ?? 0,
       semester: c.semester ?? 1,
       courseType: c.courseType,
+      category: c.category ?? null,
       isPlaceholder: c.isPlaceholder,
       placeholderKind: c.placeholderKind,
       placeholderLabel: c.placeholderLabel,

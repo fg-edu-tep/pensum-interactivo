@@ -25,7 +25,7 @@ export default function QuickChooser({ onBySemester, onByTool, onClose }: Props)
           <button type="button" className={styles.chooserCard} onClick={onBySemester}>
             <span className={styles.chooserKicker}>Más rápido</span>
             <strong>Por semestre</strong>
-            <span>Dinos qué semestre vas a cursar y marcamos todo lo anterior. Luego quitas las excepciones.</span>
+            <span>Dinos qué semestres ya terminaste y marcamos sus cursos como vistos. Luego quitas las excepciones.</span>
           </button>
           <button type="button" className={styles.chooserCard} onClick={onByTool}>
             <span className={styles.chooserKicker}>Más preciso</span>

@@ -27,12 +27,27 @@
   --accent-border: #b9d3f0;
   --accent-soft: #8fb1dd;
 
+  /* Map groups (lib/courseCategory.ts). The department's pensum PDF colours,
+     darkened only as far as white text needs (≥ 5.5:1):
+       PDF                                   fill      white
+       Fundamentos de Ingeniería   #10a36a → #3f6212   7.08  (olive: the PDF
+         green at that darkness is the "aprobada" green, 1.11:1 apart)
+       Fundamentos Transversales   #b22431   as is     6.58
+       Fundamentos Específicos     #15a5b6 → #0f737f   5.56
+       Ciclo Terminal (+ Electiva) #e8348b → #be2b72   5.56
+       Ciencias y Matemáticas      #ef7227 → #a7501b   5.52
+       Proyectos                   #1775ba → #156cab   5.58
+       Educación General (+ CBU)   #3a2c70   as is    11.84
+     The generic "Obligatorio" keeps the app's teal. */
   --t-iele: #0e6b70;
-  --t-cb: #7a5212;
+  --t-fing: #3f6212;
+  --t-ftiee: #b22431;
+  --t-fesp: #0f737f;
+  --t-ciencias: #a7501b;
   --t-otr: #4a4f5a;
-  --t-pro: #2356c4;
-  --t-ele: #a01d5d;
-  --t-cbu: #3d33a0;
+  --t-pro: #156cab;
+  --t-ele: #be2b72;
+  --t-cbu: #3a2c70;
   --t-req: #4a5568;
 
   /* Status. ONE green, ONE amber. Ratios are white-on-fill (WCAG, text 4.5:1):
@@ -63,17 +78,20 @@
   --ring-gap: var(--surface);
   --card-r: 8px;
 
-  /* Text on type fills. Primary is white (6.3–9.6:1 on every type fill).
+  /* Text on type fills. Primary is white (5.5–11.8:1 on every type fill).
      Secondary (code, credits) is a SOLID colour, never opacity — opacity made
      the ratio depend on the fill. Each is the lightest white/fill mix that still
      clears 4.5:1 on its own fill. */
   --on-type: #ffffff;
   --on-type-2-iele: #cce0e1;
-  --on-type-2-cb: #dbd0bf;
+  --on-type-2-fing: #c9d3bd;
+  --on-type-2-ftiee: #eecfd2;
+  --on-type-2-fesp: #ddebed;
+  --on-type-2-ciencias: #f3e7df;
   --on-type-2-otr: #bec0c4;
-  --on-type-2-pro: #cad6f1;
-  --on-type-2-ele: #e4c0d2;
-  --on-type-2-cbu: #b1add9;
+  --on-type-2-pro: #dce9f2;
+  --on-type-2-ele: #f7e3ed;
+  --on-type-2-cbu: #a29cbc;
   --on-type-2-req: #c5c9cf;
   --on-type-2-ok: #ecf5ef;
 }

@@ -2,6 +2,8 @@
 // shapes the Next.js version adds. The Course / ReqNode shapes are unchanged so
 // availability.ts and the React Flow graph keep working as-is.
 
+import type { CourseCategory } from "./courseCategory";
+
 export type CourseType =
   | "nucleo"
   | "electiva"
@@ -37,6 +39,9 @@ export interface Course {
   credits: number;
   semester: number;
   type: CourseType;
+  /** map group from the department's TIPO (lib/courseCategory.ts); null →
+   * derived from `type` (components/explorer/format.ts groupOf) */
+  category?: CourseCategory | null;
   isPlaceholder: boolean;
   /** placeholder taxonomy from the import (CBU|ELECTIVA|EFI|CLE|DEPT|CODEX|CI) */
   placeholderKind?: string | null;

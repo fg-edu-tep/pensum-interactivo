@@ -12,6 +12,7 @@
 
 import * as XLSX from "xlsx";
 import type { CourseType } from "../types";
+import type { CourseCategory } from "../courseCategory";
 import { normalizeCode } from "./normalizeCode";
 import { classifyCourse, type PlaceholderKind } from "./classifyPlaceholder";
 import { isPlanesMatrix, parsePlanesMatrix } from "./official/planesMatrix";
@@ -24,6 +25,9 @@ export interface ParsedPlanCourse {
   name: string;
   credits: number | null;
   courseType: CourseType;
+  /** map group from the official file's TIPO (lib/courseCategory.ts); absent in
+   * the coordinator template, null when TIPO is blank or unknown */
+  category?: CourseCategory | null;
   isPlaceholder: boolean;
   placeholderKind?: PlaceholderKind;
   placeholderLabel?: string;

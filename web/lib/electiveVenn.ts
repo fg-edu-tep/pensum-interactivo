@@ -171,3 +171,63 @@ export function vennCounts(list: VennElective[], type: VennType, term: string | 
   }
   return out;
 }
+
+// ---- the role matrix (2026-11: replaces the circles) ----
+// A summary bar on top (to scale, each part filters the list) and one row per
+// course with a cell per program × role, plus when it is taught. With both
+// programs the bar splits by program (the few courses that differ); with one
+// program it splits by role, the distinction students get wrong.
+
+export type ProgramView = "ambos" | "elc" | "ele";
+/** summary-bar parts: by program (ambos) or by role (one program) */
+export type MatrixPart = "both" | "elc" | "ele" | "ei" | "i" | "e";
+
+export interface MatrixRow {
+  e: VennElective;
+  /** the program cells shown, null = "no aplica" there */
+  elc: ProgramTag | null;
+  ele: ProgramTag | null;
+  part: MatrixPart;
+}
+
+const fold = (s: string) => s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+const roleBits = (t: ProgramTag | null) => (t ? (t.electiva ? 1 : 0) | (t.integrador ? 2 : 0) : 0);
+const rolePart = (bits: number): MatrixPart => (bits === 3 ? "ei" : bits === 2 ? "i" : "e");
+
+export interface MatrixFilters {
+  program: ProgramView;
+  type: VennType;
+  term: string | null;
+  query?: string;
+}
+
+/** Rows before the summary-bar part filter, plus the part of each. */
+export function matrixBase(list: VennElective[], f: MatrixFilters): MatrixRow[] {
+  const q = fold((f.query ?? "").trim());
+  const out: MatrixRow[] = [];
+  for (const e of list) {
+    if (f.term && !e.offeredTerms.includes(f.term)) continue;
+    if (q && !fold(`${e.name} ${e.code ?? ""}`).includes(q) && !fold((e.code ?? "").replace(/^([A-Z]+)/, "$1 ")).includes(q)) continue;
+    const elc = f.program !== "ele" && passes(e.elc, f.type) ? e.elc : null;
+    const ele = f.program !== "elc" && passes(e.ele, f.type) ? e.ele : null;
+    if (!elc && !ele) continue;
+    const part: MatrixPart =
+      f.program === "ambos" ? (elc && ele ? "both" : elc ? "elc" : "ele") : rolePart(roleBits(elc ?? ele));
+    // the tags stay whole whatever the type filter (2026-10-29 §2.1)
+    out.push({ e, elc: elc ? e.elc : null, ele: ele ? e.ele : null, part });
+  }
+  // differences between programs first, then electiva + integrador, solo
+  // integrador, solo electiva — the order a student needs to notice them
+  const rank = (r: MatrixRow) => {
+    const differs = f.program === "ambos" && r.part !== "both" ? 0 : 1;
+    const bits = roleBits(r.elc) | roleBits(r.ele);
+    return differs * 10 + (bits === 3 ? 0 : bits === 2 ? 1 : 2);
+  };
+  return out.sort((a, b) => rank(a) - rank(b) || a.e.name.localeCompare(b.e.name, "es"));
+}
+
+/** The summary bar's parts, in display order, with counts (zeros kept so the bar is stable). */
+export function matrixSummary(rows: MatrixRow[], program: ProgramView): { part: MatrixPart; count: number }[] {
+  const order: MatrixPart[] = program === "ambos" ? ["both", "elc", "ele"] : ["e", "ei", "i"];
+  return order.map((part) => ({ part, count: rows.filter((r) => r.part === part).length }));
+}

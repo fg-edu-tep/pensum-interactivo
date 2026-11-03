@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
+import * as XLSX from "xlsx";
 import { resolve } from "node:path";
 import { parsePlanesMatrix, isCompanion, slotSpec, displayCodeOf } from "./planesMatrix";
 import { parseBolsas, parseProjection, rolesFromAttrs, emptyAttrs } from "./bolsas";
@@ -120,6 +121,44 @@ test("golden PLANES_202710: 7 plans, slots, companions, credits", { skip: !have 
   // master's plans are drafts
   assert.equal(m.catalogs.find((c) => c.slug === "miele")?.status, "draft");
   assert.deepEqual(m.warnings, []);
+  // TIPO is the map group, for courses and slots alike
+  const cat = (slug: string, code: string) => m.courses[slug].find((c) => c.normalizedCode === code || c.placeholderKind === code)?.category;
+  assert.equal(cat("ielc-cbu3-pc", "IELE2206"), "obligatorio");
+  assert.equal(cat("ielc-cbu3-pc", "IELE1218"), "proyecto");
+  assert.equal(cat("ielc-cbu3-pc", "ELECTIVA"), "electiva");
+  assert.equal(cat("ielc-cbu3-pc", "CBU"), "cbu");
+  assert.ok(Object.values(m.courses).flat().every((c) => c.category));
+});
+
+test("TIPO with the PDF's categories: groups, course type, mixed-nomenclature warning", () => {
+  const head = ["Periodo", "Materia", "Créditos", "Nombre curso", "Código prerrequisito", "Código correquisito", "PLAN IELC PC", "TIPO"];
+  const rows = [
+    ["202710", "IELE-2206", 3, "FUNDAMENTOS DE ELECTRÓNICA", "", "", 4, "Fundamentos Transversales IEE"],
+    ["202710", "IELE-3200", 3, "ELECTRÓNICA ANÁLOGA", "", "", 6, "fundamentos específicos"],
+    ["202710", "MATE-1207", 3, "CÁLCULO VECTORIAL", "", "", 4, "Ciclo de Ciencias y Matemáticas"],
+    ["202710", "IELE-3018", 3, "PROYECTO DE INGENIERÍA", "", "", 7, "Proyectos"],
+    ["202710", "CCOM-1100", 3, "PENSAR, COMUNICAR Y COLABORAR", "", "", 1, "Educación General"],
+    ["202710", "ELEC", 4, "ELECTIVAS IELE", "", "", 7, "Ciclo Terminal"],
+  ];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([head, ...rows]), "PLANES");
+  const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+  const m = parsePlanesMatrix(buf);
+  const by = (code: string) => m.courses["ielc-cbu3-pc"].find((c) => c.normalizedCode === code || c.placeholderKind === code)!;
+  assert.equal(by("IELE2206").category, "ftiee");
+  assert.equal(by("IELE3200").category, "fesp");
+  assert.equal(by("MATE1207").category, "ciencias");
+  assert.equal(by("IELE3018").category, "proyecto");
+  assert.equal(by("IELE3018").courseType, "proyecto");
+  assert.equal(by("CCOM1100").category, "edugen");
+  assert.equal(by("CCOM1100").courseType, "nucleo");
+  assert.equal(by("ELECTIVA").category, "terminal");
+  assert.deepEqual(m.warnings, []);
+  rows.push(["202710", "IELE-2009", 3, "COMPUTACIÓN CIENTÍFICA", "", "", 6, "Obligatorio"]);
+  const wb2 = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb2, XLSX.utils.aoa_to_sheet([head, ...rows]), "PLANES");
+  const mixed = parsePlanesMatrix(XLSX.write(wb2, { type: "buffer", bookType: "xlsx" }) as Buffer);
+  assert.ok(mixed.warnings.some((w) => /mezcla "Obligatorio"/.test(w)));
 });
 
 test("golden BOLSAS_202710: attributes per program and PROXIMO", { skip: !have }, () => {
