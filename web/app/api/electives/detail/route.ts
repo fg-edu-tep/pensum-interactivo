@@ -10,6 +10,7 @@
 //   404 { error }
 
 import { NextResponse } from "next/server";
+import { tokenName } from "@/lib/requirementTokens";
 import { prisma } from "@/lib/db";
 import type { ReqNode } from "@/lib/types";
 import { resolveOfferingTerm } from "@/lib/termResolve";
@@ -27,7 +28,7 @@ function toTitle(s: string): string {
 function renderNames(node: ReqNode, names: Map<string, string>, parent: "AND" | "OR" | null = null): string {
   if (node.op === "COURSE") {
     const n = names.get(node.code!);
-    const label = n ? toTitle(n) : node.code!.replace(/^([A-Z]+)(\d)/, "$1 $2");
+    const label = tokenName(node.code!) ?? (n ? toTitle(n) : node.code!.replace(/^([A-Z]+)(\d)/, "$1 $2"));
     return node.soft ? `${label} (puede ser al tiempo)` : label;
   }
   const inner = (node.items ?? []).map((it) => renderNames(it, names, node.op as "AND" | "OR")).join(node.op === "AND" ? " y " : " o ");
@@ -39,6 +40,8 @@ async function namesFor(codes: string[]): Promise<Map<string, string>> {
   if (codes.length === 0) return out;
   for (const c of await prisma.course.findMany({ where: { normalizedCode: { in: codes } }, select: { normalizedCode: true, nameEs: true } }))
     out.set(c.normalizedCode, c.nameEs);
+  for (const c of await prisma.codeName.findMany({ where: { code: { in: codes.filter((x) => !out.has(x)) } }, select: { code: true, name: true } }).catch(() => []))
+    out.set(c.code, c.name);
   const missing = codes.filter((c) => !out.has(c));
   if (missing.length) {
     for (const r of await prisma.registroCourse.findMany({ where: { normalizedCode: { in: missing } }, select: { normalizedCode: true, nameEs: true }, orderBy: { importId: "desc" } }))
@@ -97,5 +100,6 @@ export async function GET(req: Request) {
     minCreditsSemesters: e.minCredits ? Math.round(e.minCredits / 15) : null,
     lastOfferedTerm: e.lastOfferedTerm,
     nextOfferingTerm: e.nextOfferingTerm,
+    projection: e.projection,
   });
 }

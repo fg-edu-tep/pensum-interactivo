@@ -61,3 +61,41 @@ test("no code and no requirements = unknown (never 'puedes tomarla'); master's-o
   assert.equal(electiveState(mag, { ...ctx([]), pregrado: true }), "blocked");
   assert.equal(electiveState(mag, ctx([])), "now");
 });
+
+// ---- official bag (BOLSAS, 2026-11): independent attributes per program ----
+const attrs = (iele: Partial<Record<"obligatoria" | "electiva" | "integrador", boolean>>, ielc: Partial<Record<"obligatoria" | "electiva" | "integrador", boolean>> = iele) => {
+  const base = { obligatoria: false, electiva: false, integrador: false, profundizacion: false };
+  return { IELE: { ...base, ...iele }, IELC: { ...base, ...ielc }, MIELE: { ...base }, MIELC: { ...base } };
+};
+const PRACT = elective(10, { code: "IELE3090", attrs: attrs({ integrador: true }) });
+const DIG = elective(11, { code: "IELE3740", attrs: attrs({ electiva: true, integrador: true }) });
+const POT = elective(12, { code: "IELE3106", attrs: attrs({ obligatoria: true }, { electiva: true }) });
+const MAIA = elective(13, { code: "MAIA4100", attrs: attrs({ electiva: true }), programRestriction: "INCLUYE MAEST.INTELIGENCIA ARTIFICIAL" });
+const official = [PRACT, DIG, POT, MAIA];
+
+test("integrador is not a subset of electiva: Práctica profesional only in the CI slot", () => {
+  assert.ok(slotCatalog(official, "IELE", slot("CI")).includes(PRACT));
+  assert.ok(!slotCatalog(official, "IELE", slot("ELECTIVA")).includes(PRACT));
+  assert.ok(slotCatalog(official, "IELE", slot("CI")).includes(DIG) && slotCatalog(official, "IELE", slot("ELECTIVA")).includes(DIG));
+});
+
+test("same course, different role per program; a course of the plan is not its elective", () => {
+  assert.ok(!slotCatalog(official, "IELE", slot("ELECTIVA")).includes(POT));
+  assert.ok(slotCatalog(official, "IELC", slot("ELECTIVA")).includes(POT));
+  // in Electrónica's plan by code (e.g. a plan that already has it) → excluded
+  assert.ok(!slotCatalog(official, "IELC", slot("ELECTIVA"), new Set(["IELE3106"])).includes(POT));
+});
+
+test("MAIA courses restricted to a master's are never 'Puedes tomarla' for pregrado", () => {
+  assert.equal(electiveState(MAIA, { ...ctx([]), programCode: "IELE" }), "blocked");
+});
+
+test("'Aún no' lists what's missing; an unmet OR is one group of alternatives (grievance 2026-10-29)", async () => {
+  const { missingGroups, requiredCourseCodes } = await import("./electiveAvailability");
+  const { parseRequirement } = await import("./import/requirementParser");
+  const t = parseRequirement("EXMA1 O ISIS 2007 O IELE 2300");
+  assert.deepEqual(missingGroups(t, () => false, requiredCourseCodes(t)), [["ISIS2007", "IELE2300"]]);
+  const t2 = parseRequirement("IELE 2100 Y (LENG 2999 O ENGL7) Y IIND 2106");
+  assert.deepEqual(missingGroups(t2, (c) => c === "IELE2100", requiredCourseCodes(t2)), [["IIND2106"]]);
+  assert.deepEqual(missingGroups(t, (c) => c === "IELE2300", requiredCourseCodes(t)), []);
+});

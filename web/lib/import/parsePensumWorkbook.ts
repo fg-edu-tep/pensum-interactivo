@@ -22,6 +22,8 @@ export interface ParsedCourse {
   credits: number;
   semester: number;
   courseType: CourseType;
+  /** map group (lib/courseCategory.ts), when the source file has one */
+  category?: string | null;
   isPlaceholder: boolean;
   placeholderKind?: PlaceholderKind;
   placeholderLabel?: string;

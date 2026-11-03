@@ -103,7 +103,7 @@ export function avanceSteps(): TourStepDef[] {
       target: '[data-tour="status"]',
       marker: "Estados",
       title: "Qué significa cada color",
-      body: "Verde con ✓: ya lo viste. Pastilla azul con el semestre: está en tu canasta. Rayado gris: aún te faltan prerrequisitos. Sin marca: lo puedes inscribir. Marcar un curso no marca los anteriores, por si tienes homologaciones.",
+      body: "Verde con ✓: ya lo viste. Pastilla azul con el semestre: está en tu canasta. Contorno azul: tu canasta te lo desbloquea. Rayado gris: aún te faltan prerrequisitos. Sin marca: lo puedes inscribir. Toca un estado arriba para ver solo esos cursos.",
     },
     {
       id: "reltoggle",

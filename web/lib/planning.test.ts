@@ -74,3 +74,44 @@ test("enabledBy lists the requirement courses in the cart and among the approved
   const by = enabledBy(COM, ctx(["IELE2500"], ["IIND2106"]));
   assert.deepEqual([by.fromApproved.length, by.fromCart.length], [1, 1]);
 });
+
+// ---- release gate 1 (2026-10-29): cart warnings ----
+import { cartWarnings, restrictionFor } from "./planning";
+
+const F2 = course("FISI1528");
+const FE = course("IELE2206", "IELE 1002 Y FISI 1528*", { concurrentPrereqIds: ["FISI1528"] });
+const OPT = course("IELE3006", "IIND 2106 Y IELE 2009");
+const CC = course("IELE2009");
+const gateCourses = [FUND, F2, FE, PROB, OPT, CC];
+const gctx = (approved: string[], cart: string[]): PlanContext => ({
+  approved: new Set(approved), cart: new Set(cart), courses: gateCourses, catalogCodes: catalogCodesOf(gateCourses),
+});
+
+test("Optimización without Probabilidad: listed with what it misses", () => {
+  const w = cartWarnings(gctx(["IELE2009"], ["IELE3006"]));
+  assert.equal(w.length, 1);
+  assert.equal(w[0].course.id, "IELE3006");
+  assert.deepEqual(w[0].missing.map((c) => c.id), ["IIND2106"]);
+});
+
+test("removing a corequisite from the cart flags the course that needed it (§3.3)", () => {
+  // Fundamentos de electrónica with Física 2 in the cart: fine
+  assert.deepEqual(cartWarnings(gctx(["IELE1002"], ["IELE2206", "FISI1528"])), []);
+  // Física 2 taken out: Fundamentos needs it approved OR in the cart
+  const w = cartWarnings(gctx(["IELE1002"], ["IELE2206"]));
+  assert.equal(w.length, 1);
+  assert.deepEqual(w[0].together.map((c) => c.id), ["FISI1528"]);
+  assert.deepEqual(w[0].missing, []);
+});
+
+test("Registro's program restriction: MAIA courses closed to IELE/IELC, open when they list the program", () => {
+  const maia = { programRestriction: "INCLUYE MAEST.INTELIGENCIA ARTIFICIAL", levelRestriction: null };
+  assert.ok(restrictionFor(maia, "IELE"));
+  assert.equal(restrictionFor({ programRestriction: "INCLUYE INGENIERIA ELECTRONICA & INCLUYE INGENIERIA ELECTRICA" }, "IELC"), null);
+  assert.equal(restrictionFor({ levelRestriction: "INCLUYE MAGISTER" }, "IELE"), "posgrado");
+  // master's plans aren't judged by the undergraduate rule
+  assert.equal(restrictionFor(maia, "MIELE"), null);
+  const M = course("MAIA4100", "", maia);
+  const p = planner({ approved: new Set(), cart: new Set(), courses: [M], catalogCodes: new Set(["MAIA4100"]), programCode: "IELE" });
+  assert.equal(p.state(M), "blocked");
+});

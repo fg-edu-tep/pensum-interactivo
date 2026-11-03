@@ -142,10 +142,24 @@ export function loadAttestationsFromHash(): Set<string> | null {
   }
 }
 
+/** The elective bag (lib/electiveBag.ts) carried by a shared link. */
+export function loadBagFromHash<T = unknown>(): T[] | null {
+  if (typeof window === "undefined") return null;
+  const raw = new URLSearchParams(window.location.hash.replace(/^#/, "")).get("bolsa");
+  if (!raw) return null;
+  try {
+    const v = JSON.parse(decodeURIComponent(escape(atob(raw))));
+    return Array.isArray(v) ? (v as T[]) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function buildShareUrl(
   approved: Set<string>,
   assignments: ElectiveAssignments,
-  attestations: Set<string>
+  attestations: Set<string>,
+  bag: unknown[] = []
 ): string {
   const url = new URL(window.location.href);
   const params = new URLSearchParams();
@@ -155,6 +169,9 @@ export function buildShareUrl(
   }
   if (attestations.size > 0) {
     params.set("requisitos", encodeURIComponent([...attestations].join(",")));
+  }
+  if (bag.length > 0) {
+    params.set("bolsa", btoa(unescape(encodeURIComponent(JSON.stringify(bag)))));
   }
   url.hash = params.toString();
   return url.toString();

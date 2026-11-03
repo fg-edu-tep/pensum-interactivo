@@ -190,7 +190,7 @@ export default function ImportReview({ jobId, status, diff }: Props) {
       <EntitySection title="Nodos de requisito" rows={diff.requirementNodes} />
       <EntitySection title="Requisitos de grado" rows={diff.gradRules} />
 
-      <div className="import-actions">
+      {status !== "review-only" && <div className="import-actions">
         {diff.counts.removed > 0 && (
           <label>
             <input
@@ -229,7 +229,7 @@ export default function ImportReview({ jobId, status, diff }: Props) {
           Descartar
         </button>
         {error && <span className="admin-error">{error}</span>}
-      </div>
+      </div>}
     </>
   );
 }

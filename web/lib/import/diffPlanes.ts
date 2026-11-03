@@ -16,10 +16,12 @@ interface DbCourseRow {
   credits: number;
   suggestedSemester: number;
   courseType: string;
+  category: string | null;
   isPlaceholder: boolean;
   placeholderKind: string | null;
   placeholderLabel: string | null;
   prereqText: string | null;
+  coreqText: string | null;
   manuallyEdited: boolean;
   lockedFields: unknown;
   courseId: number | null;
@@ -73,6 +75,9 @@ const eq = (a: unknown, b: unknown) => {
   if (a == null || a === "") return b == null || b === "";
   return String(a) === String(b);
 };
+
+/** Registro pads requisites with runs of spaces: they don't count as a change */
+const ws = (s: string | null | undefined) => String(s ?? "").replace(/\s+/g, " ").replace(/\(\s+/g, "(").replace(/\s+\)/g, ")").trim();
 
 function occKey(
   c: { isPlaceholder: boolean; placeholderKind?: string | null; normalizedCode: string; semester: number | null },
@@ -172,20 +177,32 @@ export async function buildPlanesDiff(
         ((dc.lockedFields as string[] | null) ?? []).map(String)
       );
       const changes: FieldChange[] = [];
+      // the official matrix carries Banner's 30-character names ("ELEMENT.SISTEMAS
+      // ELÉCTRICOS"): a course already in the plan keeps its curated name
+      const matrix = parsed.format === "matrix";
       const consider: [string, unknown, unknown][] = [
-        ["name", dc.name, pc.name],
+        ...(matrix ? [] : ([["name", dc.name, pc.name]] as [string, unknown, unknown][])),
         ["credits", dc.credits, pc.credits],
         ["suggestedSemester", dc.suggestedSemester, pc.semester],
         ["courseType", dc.courseType, pc.courseType],
         ["placeholderLabel", dc.placeholderLabel, pc.placeholderLabel ?? null],
+        // only the official file has TIPO; the coordinator template leaves it alone
+        ...(pc.category !== undefined ? ([["category", dc.category, pc.category]] as [string, unknown, unknown][]) : []),
       ];
       for (const [f, before, after] of consider) {
         if (after == null && f === "suggestedSemester") continue; // missing sem -> warning already
         if (!eq(before, after)) changes.push({ field: f, before, after });
       }
       // prereqText: only propose a change when the sheet has a non-empty value
-      if (pc.prereqText && !eq(dc.prereqText ?? "", pc.prereqText)) {
+      if (pc.prereqText && !eq(ws(dc.prereqText), ws(pc.prereqText))) {
         changes.push({ field: "prereqText", before: dc.prereqText ?? "", after: pc.prereqText });
+      }
+      // the matrix is authoritative for requisites: an emptied cell clears them
+      if (matrix && !pc.isPlaceholder && !pc.prereqText && (dc.prereqText ?? "").trim()) {
+        changes.push({ field: "prereqText", before: dc.prereqText ?? "", after: "" });
+      }
+      if (pc.coreqText !== undefined && !pc.isPlaceholder && !eq(ws(dc.coreqText), ws(pc.coreqText))) {
+        changes.push({ field: "coreqText", before: dc.coreqText ?? "", after: pc.coreqText });
       }
 
       if (changes.length === 0) {
@@ -231,6 +248,10 @@ export async function buildPlanesDiff(
       courses: courseDiffs,
       unchangedCount: unchanged,
     });
+  }
+
+  if (parsed.format === "matrix") {
+    return { catalogs, requirementNodes: [], gradRules: [], warnings, counts };
   }
 
   // ---------- requirement nodes (compared against every catalog that has them;

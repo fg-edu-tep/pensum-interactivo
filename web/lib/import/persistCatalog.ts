@@ -210,6 +210,7 @@ export async function persistParsedCatalog(
       credits: c.credits,
       suggestedSemester: c.semester,
       courseType: c.courseType,
+      category: c.category ?? null,
       isPlaceholder: c.isPlaceholder,
       placeholderKind: c.placeholderKind ?? null,
       placeholderLabel: c.placeholderLabel ?? null,

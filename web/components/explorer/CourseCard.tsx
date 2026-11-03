@@ -1,6 +1,7 @@
 "use client";
 
 import type { BoxHalf } from "@/lib/electiveBoxes";
+import { spanText } from "@/lib/electiveBag";
 import { Handle, Position } from "reactflow";
 import type { Course, AvailabilityStatus } from "@/lib/types";
 import { groupOf, groupClass, toSentenceCase, termShort, type CourseGroup } from "./format";
@@ -38,23 +39,28 @@ export interface CourseCardData {
   onHover: (id: string | null, rect?: DOMRect) => void;
 }
 
-/** Second channel for course type (shape, not just hue): Proyecto/CBU and
- * Otras/IELE sit close in colour at card size, and colour alone fails for
- * colour-blind users. 8×8, drawn in the card's secondary text colour. */
+/** Second channel for the group (shape, not just hue): some PDF colours sit
+ * close at card size, and colour alone fails for colour-blind users. 8×8,
+ * drawn in the card's secondary text colour. */
 export function TypeGlyph({ group }: { group: CourseGroup }) {
   const common = { width: 8, height: 8, viewBox: "0 0 8 8", "aria-hidden": true as const, className: styles.typeGlyph };
   switch (group) {
-    case "iele": // circle
+    case "obligatorio":
+    case "ftiee": // circle
       return <svg {...common}><circle cx="4" cy="4" r="3.5" fill="currentColor" /></svg>;
-    case "cb": // square
+    case "fesp": // square
       return <svg {...common}><rect x=".5" y=".5" width="7" height="7" fill="currentColor" /></svg>;
-    case "otr": // diamond
+    case "fing": // diamond
       return <svg {...common}><path d="M4 0 8 4 4 8 0 4z" fill="currentColor" /></svg>;
-    case "pro": // triangle
+    case "ciencias": // inverted triangle
+      return <svg {...common}><path d="M.2 .5h7.6L4 7.5z" fill="currentColor" /></svg>;
+    case "proyecto": // triangle
       return <svg {...common}><path d="M4 .5 7.8 7.5H.2z" fill="currentColor" /></svg>;
-    case "ele": // hollow ring
+    case "electiva":
+    case "terminal": // hollow ring
       return <svg {...common}><circle cx="4" cy="4" r="3" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>;
-    case "cbu": // half circle
+    case "cbu":
+    case "edugen": // half circle
       return (
         <svg {...common}>
           <circle cx="4" cy="4" r="3.25" fill="none" stroke="currentColor" strokeWidth="1" />
@@ -173,21 +179,16 @@ export default function CourseCard({ data }: { data: CourseCardData }) {
   );
 }
 
-/** "Esta materia vale 4 créditos y ocupa 2 casillas" for every course in the box */
+/** "Esta materia vale 3 créditos: ocupa 1½ casillas" for every course in the box */
 function halvesTooltip(halves: [BoxHalf | null, BoxHalf | null]): string {
   const seen = new Set<string>();
   const parts: string[] = [];
   for (const h of halves) {
     if (!h || seen.has(h.key)) continue;
     seen.add(h.key);
-    const boxes = Math.ceil(h.credits / 2);
-    parts.push(
-      h.credits > 2 || h.cont
-        ? `${toSentenceCase(h.title)}: esta materia vale ${h.credits} créditos y ocupa ${boxes === 1 ? "1 casilla y media" : `${boxes} casillas`}`
-        : `${toSentenceCase(h.title)} (${h.credits} créditos)`
-    );
+    parts.push(h.credits !== 2 || h.cont ? `${toSentenceCase(h.title)}. ${spanText(h.credits)}` : `${toSentenceCase(h.title)} (2 créditos)`);
   }
-  if (!halves[0] || !halves[1]) parts.push("Medio espacio libre (1 crédito)");
+  if (!halves[0] || !halves[1]) parts.push("1 cr libre");
   return parts.join(" · ");
 }
 
@@ -213,7 +214,7 @@ function HalvesTitle({ halves }: { halves: [BoxHalf | null, BoxHalf | null] }) {
               {h.cont && <span className={styles.halfCont}> (cont.)</span>}
             </>
           ) : (
-            "Libre · 1 cr"
+            "1 cr libre"
           )}
         </span>
       ))}

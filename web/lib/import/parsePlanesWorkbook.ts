@@ -12,8 +12,10 @@
 
 import * as XLSX from "xlsx";
 import type { CourseType } from "../types";
+import type { CourseCategory } from "../courseCategory";
 import { normalizeCode } from "./normalizeCode";
 import { classifyCourse, type PlaceholderKind } from "./classifyPlaceholder";
+import { isPlanesMatrix, parsePlanesMatrix } from "./official/planesMatrix";
 
 export interface ParsedPlanCourse {
   rowNum: number; // 1-based sheet row, for error messages
@@ -23,10 +25,15 @@ export interface ParsedPlanCourse {
   name: string;
   credits: number | null;
   courseType: CourseType;
+  /** map group from the official file's TIPO (lib/courseCategory.ts); absent in
+   * the coordinator template, null when TIPO is blank or unknown */
+  category?: CourseCategory | null;
   isPlaceholder: boolean;
   placeholderKind?: PlaceholderKind;
   placeholderLabel?: string;
   prereqText: string;
+  /** Registro corequisite text ("IELE-1002L"); only the official matrix file has it */
+  coreqText?: string;
   notes: string;
 }
 
@@ -60,6 +67,10 @@ export interface ParsedRequirementNode {
 }
 
 export interface ParsedPlanesWorkbook {
+  /** "matrix" = the department's official PLANES_<term>.xlsx (one column per
+   * plan); absent = the coordinator template. The matrix carries no graduation
+   * rules / requirement nodes, so those are left as they are. */
+  format?: "matrix" | "template";
   catalogs: ParsedCatalogMeta[];
   courses: Record<string, ParsedPlanCourse[]>; // slug -> rows
   gradRequirements: ParsedGradRequirement[];
@@ -195,6 +206,8 @@ export function parsePlanesWorkbook(
   const wb = XLSX.read(buffer, {
     type: buffer instanceof Buffer ? "buffer" : "array",
   });
+  // the department's official file (one column per plan) — lib/import/official
+  if (isPlanesMatrix(wb)) return parsePlanesMatrix(wb);
   const warnings: string[] = [];
   const courses: Record<string, ParsedPlanCourse[]> = {};
   let catalogs: ParsedCatalogMeta[] = [];

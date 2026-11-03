@@ -1,33 +1,35 @@
 import type { Course } from "@/lib/types";
+import { CATEGORY_LABEL, CATEGORY_ORDER, type CourseCategory } from "@/lib/courseCategory";
 import { termLabel, planTerm } from "@/lib/term";
 
-/** DATA-01 stand-in: derive the display group from the code prefix — the
- * design doc's own default when an admin-editable `grupo` field is empty. */
-export type CourseGroup = "iele" | "cb" | "otr" | "pro" | "ele" | "cbu" | "req";
+/** The map group: the department's TIPO for the course (lib/courseCategory.ts),
+ * plus "req" for the 0-credit requirement nodes. Rows without a TIPO (older
+ * loads) derive it from the course type. */
+export type CourseGroup = CourseCategory | "req";
 
 export function groupOf(course: Course): CourseGroup {
-  if (course.type === "proyecto") return "pro";
-  if (course.isPlaceholder) {
-    const kind = course.placeholderKind ?? "";
-    if (kind === "CBU") return "cbu";
-    if (kind === "REQING") return "req";
-    if (course.type === "electiva" || kind === "ELECTIVA" || kind === "EFI" || kind === "CI" || kind === "CLE")
-      return "ele";
-    // DEPT/CODEX and other slots fall back on the prefix rule below
-  }
-  const code = course.codeNormalized;
-  if (/^(IELE|IELC)/.test(code)) return "iele";
-  if (/^(MATE|FISI)/.test(code)) return "cb";
-  return "otr";
+  const kind = course.isPlaceholder ? (course.placeholderKind ?? "") : "";
+  if (kind === "REQING") return "req";
+  if (course.category) return course.category;
+  if (course.type === "proyecto") return "proyecto";
+  if (kind === "CBU" || course.type === "cbu") return "cbu";
+  if (course.isPlaceholder && (course.type === "electiva" || kind === "ELECTIVA" || kind === "EFI" || kind === "CI" || kind === "CLE"))
+    return "electiva";
+  return "obligatorio";
 }
 
+/** CSS-module class per group: sets --card-color and --on-type-2 */
 const GROUP_TYPE_CLASS: Record<CourseGroup, string> = {
-  iele: "typeIele",
-  cb: "typeCb",
-  otr: "typeOtr",
-  pro: "typePro",
-  ele: "slotEle",
-  cbu: "slotCbu",
+  obligatorio: "catObligatorio",
+  fing: "catFing",
+  ftiee: "catFtiee",
+  fesp: "catFesp",
+  terminal: "catTerminal",
+  electiva: "catTerminal",
+  ciencias: "catCiencias",
+  proyecto: "catProyecto",
+  edugen: "catEdugen",
+  cbu: "catEdugen",
   req: "slotReq",
 };
 
@@ -35,12 +37,18 @@ export function groupClass(group: CourseGroup): string {
   return GROUP_TYPE_CLASS[group];
 }
 
+// The PDF's families: Electiva is Ciclo Terminal's pink, CBU is Educación
+// General's purple (components/explorer/tokens.css).
 const GROUP_COLOR_VAR: Record<CourseGroup, string> = {
-  iele: "var(--t-iele)",
-  cb: "var(--t-cb)",
-  otr: "var(--t-otr)",
-  pro: "var(--t-pro)",
-  ele: "var(--t-ele)",
+  obligatorio: "var(--t-iele)",
+  fing: "var(--t-fing)",
+  ftiee: "var(--t-ftiee)",
+  fesp: "var(--t-fesp)",
+  terminal: "var(--t-ele)",
+  electiva: "var(--t-ele)",
+  ciencias: "var(--t-ciencias)",
+  proyecto: "var(--t-pro)",
+  edugen: "var(--t-cbu)",
   cbu: "var(--t-cbu)",
   req: "var(--t-req)",
 };
@@ -48,15 +56,19 @@ export function groupColor(group: CourseGroup): string {
   return GROUP_COLOR_VAR[group];
 }
 
-export const GROUP_LABEL: Record<CourseGroup, string> = {
-  iele: "IELE",
-  cb: "Ciencias básicas",
-  otr: "Otras facultades",
-  pro: "Proyecto",
-  ele: "Electiva",
-  cbu: "CBU",
-  req: "Requisito de grado",
-};
+export const GROUP_LABEL: Record<CourseGroup, string> = { ...CATEGORY_LABEL, req: "Requisito de grado" };
+
+/** The groups a plan uses, in legend order; `dashed` when every member is a
+ * slot (drawn dashed on the map). */
+export function groupsOf(courses: Course[]): { group: CourseGroup; dashed: boolean }[] {
+  const slotsOnly = new Map<CourseGroup, boolean>();
+  for (const c of courses) {
+    const g = groupOf(c);
+    if (g === "req") continue;
+    slotsOnly.set(g, (slotsOnly.get(g) ?? true) && c.isPlaceholder);
+  }
+  return CATEGORY_ORDER.filter((g) => slotsOnly.has(g)).map((g) => ({ group: g, dashed: slotsOnly.get(g)! }));
+}
 
 /** DATA-02 stand-in: sentence-case the (all-caps, as-imported) title, keeping
  * known acronyms upper-cased. Display-only — never written back to the DB. */
@@ -66,9 +78,14 @@ export function toSentenceCase(raw: string): string {
   if (!raw) return raw;
   const lower = raw.toLocaleLowerCase("es");
   const sentence = lower.charAt(0).toLocaleUpperCase("es") + lower.slice(1);
-  return sentence.replace(/\p{L}+/gu, (word) => {
+  return sentence.replace(/\p{L}+/gu, (word, offset: number, all: string) => {
     const upper = word.toLocaleUpperCase("es");
-    return ACRONYMS.includes(upper) ? upper : word;
+    if (ACRONYMS.includes(upper)) return upper;
+    // roman numerals: "Física II", "Taller IEE 1", "Cálculo III" ("i"/"v" only
+    // when they end the name or precede a parenthesis, so the word "i" never is)
+    if (/^(II|III|IV|VI|VII|VIII|IX)$/.test(upper)) return upper;
+    if (/^(I|V|X)$/.test(upper) && offset > 0 && /^\s*(\(|$)/.test(all.slice(offset + word.length))) return upper;
+    return word;
   });
 }
 
@@ -82,9 +99,16 @@ export const termShort = termLabel;
 
 /** The term the basket/planner targets — derived from today's date, not from
  * the (seed-time) catalog term, so it rolls over on its own. */
+// The period the cart plans for: the one the official load opened for planning
+// (payload.terms.planning), set once by PensumExplorer; the calendar's next
+// regular semester before that.
+let planningOverride: string | null = null;
+export function setPlanningTerm(code: string | null | undefined) {
+  planningOverride = code && /^\d{6}$/.test(code) ? code : null;
+}
 export function nextTermShort(): string {
-  return termLabel(planTerm());
+  return termLabel(nextTermCode());
 }
 export function nextTermCode(): string {
-  return planTerm();
+  return planningOverride ?? planTerm();
 }

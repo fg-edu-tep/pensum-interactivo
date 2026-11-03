@@ -40,3 +40,66 @@ test("filters: curso integrador and offered this semester, combinable", () => {
   const counts = countByMask(filterVenn(list, { integrador: false, offeredIds: null }));
   assert.deepEqual([counts.get(VENN_ELE), counts.get(VENN_ELE | VENN_ELC), counts.get(VENN_ELC)], [1, 1, 1]);
 });
+
+// ---- official bag (2026-10-29 review §2) ----
+import { tagText, vennRows, vennCounts, programTag } from "./electiveVenn";
+
+const off = (id: number, name: string, iele: object, ielc: object, offeredTerms: string[] = []) =>
+  row({ id, name, attrs: { IELE: iele, IELC: ielc }, offeredTerms });
+const PRACT = off(1, "Práctica profesional", { integrador: true }, { integrador: true }, ["202710"]);
+const DIG = off(2, "Digitalización", { electiva: true, integrador: true }, { electiva: true, integrador: true }, ["202710"]);
+const POT = off(3, "Electrónica de potencia", { obligatoria: true }, { electiva: true }, []);
+const ROB = off(4, "Robótica", { electiva: true }, { electiva: true }, ["202710"]);
+const list = toVennElectives([PRACT, DIG, POT, ROB]);
+
+test("tags are per program and independent: 'Solo integrador', 'Electiva + Integrador', 'Solo electiva'", () => {
+  assert.equal(tagText(list[0].ele!), "Solo integrador");
+  assert.equal(tagText(list[1].ele!), "Electiva + Integrador");
+  assert.equal(tagText(list[3].elc!), "Solo electiva");
+  // obligatoria in Eléctrica → not in its column
+  assert.equal(programTag(POT, "IELE"), null);
+  assert.equal(list[2].mask, VENN_ELC);
+});
+
+test("double program: rows aligned by course, empty slot where a course doesn't count", () => {
+  const rows = vennRows(list, { programs: { ele: true, elc: true }, type: "todas", term: null });
+  const pot = rows.find((r) => r.e.name === "Electrónica de potencia")!;
+  assert.deepEqual([pot.ele, pot.elc], [false, true]);
+  assert.equal(rows.length, 4);
+});
+
+test("filters: integradores keeps tags (Electiva + Integrador still says so), period = an NRC in P", () => {
+  const integ = vennRows(list, { programs: { ele: true, elc: false }, type: "integradores", term: null });
+  assert.deepEqual(integ.map((r) => r.e.name).sort(), ["Digitalización", "Práctica profesional"]);
+  assert.equal(tagText(integ.find((r) => r.e.name === "Digitalización")!.e.ele!), "Electiva + Integrador");
+  const p = vennRows(list, { programs: { ele: false, elc: true }, type: "electivas", term: "202710" });
+  assert.deepEqual(p.map((r) => r.e.name).sort(), ["Digitalización", "Robótica"]);
+  assert.equal(vennCounts(list, "todas", null).get(VENN_ELE | VENN_ELC), 3);
+});
+
+// ---- role matrix ----
+import { matrixBase, matrixSummary } from "./electiveVenn";
+
+test("matrix, both programs: the course that differs comes first; bar = 3 in both · 1 solo Electrónica · 0 solo Eléctrica", () => {
+  const rows = matrixBase(list, { program: "ambos", type: "todas", term: null });
+  assert.equal(rows[0].e.name, "Electrónica de potencia");
+  assert.equal(rows[0].ele, null);
+  assert.deepEqual(matrixSummary(rows, "ambos").map((p) => p.count), [3, 1, 0]);
+  // then electiva + integrador, solo integrador, solo electiva
+  assert.deepEqual(rows.slice(1).map((r) => r.e.name), ["Digitalización", "Práctica profesional", "Robótica"]);
+});
+
+test("matrix, one program: the bar splits by role; type and period filter, tags stay whole", () => {
+  const rows = matrixBase(list, { program: "ele", type: "todas", term: null });
+  assert.deepEqual(matrixSummary(rows, "ele"), [{ part: "e", count: 1 }, { part: "ei", count: 1 }, { part: "i", count: 1 }]);
+  const integ = matrixBase(list, { program: "ele", type: "integradores", term: null });
+  assert.deepEqual(integ.find((r) => r.e.name === "Digitalización")!.ele, { electiva: true, integrador: true });
+  assert.equal(matrixBase(list, { program: "elc", type: "todas", term: "202710" }).length, 3);
+});
+
+test("matrix search ignores accents and matches 'IELE 3338' style codes", () => {
+  const withCode = toVennElectives([row({ id: 9, name: "Robótica", code: "IELE3338", attrs: { IELE: { electiva: true }, IELC: { electiva: true } }, offeredTerms: [] })]);
+  assert.equal(matrixBase(withCode, { program: "ambos", type: "todas", term: null, query: "robotica" }).length, 1);
+  assert.equal(matrixBase(withCode, { program: "ambos", type: "todas", term: null, query: "iele 3338" }).length, 1);
+  assert.equal(matrixBase(withCode, { program: "ambos", type: "todas", term: null, query: "potencia" }).length, 0);
+});

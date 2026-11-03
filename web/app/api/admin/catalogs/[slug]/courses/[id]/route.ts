@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
 import { normalizeCode } from "@/lib/import/normalizeCode";
 import { parseRequirement } from "@/lib/import/requirementParser";
+import { isCourseCategory } from "@/lib/courseCategory";
 import { syncCatalogCourses, type SyncedCourse } from "@/lib/pairing/syncCatalogCourses";
 
 export const runtime = "nodejs";
@@ -16,6 +17,7 @@ const SCALAR_FIELDS = [
   "credits",
   "suggestedSemester",
   "courseType",
+  "category",
   "isPlaceholder",
   "placeholderKind",
   "placeholderLabel",
@@ -62,6 +64,12 @@ export async function PATCH(
       data.suggestedSemester = n;
     } else if (f === "isPlaceholder") {
       data.isPlaceholder = Boolean(body[f]);
+    } else if (f === "category") {
+      const v = body[f] == null ? "" : String(body[f]).trim();
+      if (v && !isCourseCategory(v)) {
+        return NextResponse.json({ error: "Grupo inválido." }, { status: 400 });
+      }
+      data.category = v || null;
     } else {
       const v = body[f] == null ? null : String(body[f]).trim();
       (data as Record<string, unknown>)[f] = f === "name" || f === "displayCode" ? v ?? "" : v || null;

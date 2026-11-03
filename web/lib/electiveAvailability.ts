@@ -11,12 +11,29 @@
 //   CI (Curso integrador)                        the bag's integrador electives.
 //
 // A catalog nobody can evaluate yet (no codes / requirements in the data)
-// stays enabled with a "verifica prerrequisitos" note, like EFI. Pure.
+// stays enabled with a "verifica prerrequisitos" note, like EFI.
+//
+// With the official bag (BOLSAS, 2026-11) each course carries independent
+// attributes per program — electiva / integrador / obligatoria — and those
+// decide the catalogs: Electiva slot = "electiva" for the plan's program,
+// CI slot = "integrador" (not a subset of electiva: Práctica profesional is
+// integrador only). A course that is in the plan itself (by code) is never one
+// of its electives (Electrónica de potencia is obligatoria in Eléctrica).
+// Registro's program restriction (MAIA courses only for some master's) keeps
+// a course from being "takeable" for students it excludes. Pure.
 
 import type { Course, ElectiveDTO, ReqNode, RoleCell } from "./types";
 import { satisfied } from "./availability";
 import { parseRequirement } from "./import/requirementParser";
 import { foldAccents } from "./import/textMatch";
+import { restrictionFor } from "./planning";
+
+type ProgKey = "IELE" | "IELC" | "MIELE" | "MIELC";
+function programKeys(programCode: string): ProgKey[] {
+  if (programCode === "DOBLE") return ["IELE", "IELC"];
+  if (programCode === "IELC" || programCode === "MIELE" || programCode === "MIELC") return [programCode];
+  return ["IELE"];
+}
 
 /** role words that make a bag row usable in an elective slot (not
  * obligatoria / proyecto de grado / práctica / pasantía) */
@@ -39,12 +56,29 @@ export function narrowFromSlot(slotLabel: string): string | null {
   return null;
 }
 
-/** The bag electives a slot accepts. */
+/** The bag electives a slot accepts. `pensumCodes`: the plan's own course
+ * codes — a course of the plan is not one of its electives. */
 export function slotCatalog(
   electives: ElectiveDTO[],
   programCode: string,
-  slot: { placeholderKind?: string | null; placeholderLabel?: string | null; code: string }
+  slot: { placeholderKind?: string | null; placeholderLabel?: string | null; code: string },
+  pensumCodes?: Set<string>
 ): ElectiveDTO[] {
+  const inPlan = (e: ElectiveDTO) => !!(e.code && pensumCodes?.has(e.code));
+  if (electives.some((e) => e.attrs)) {
+    const keys = programKeys(programCode);
+    const master = keys[0].startsWith("M");
+    return electives.filter((e) => {
+      if (!e.attrs || inPlan(e)) return false;
+      return keys.some((k) => {
+        const a = e.attrs![k];
+        if (!a) return false;
+        if (slot.placeholderKind === "CI") return a.integrador;
+        if (master) return a.profundizacion;
+        return a.electiva;
+      });
+    });
+  }
   if (slot.placeholderKind === "CI") return electives.filter((e) => e.isCursoIntegrador);
   const want = narrowFromSlot(slot.placeholderLabel || slot.code);
   return electives.filter((e) => {
@@ -73,6 +107,10 @@ export interface ElectiveCtx {
   approvedCredits: number;
   /** undergraduate plan: master's-only electives (Registro "INCLUYE MAGISTER") don't count */
   pregrado?: boolean;
+  /** the plan's program: Registro's program restriction (official bag) */
+  programCode?: string;
+  /** the plan's own codes (a course of the plan is not one of its electives) */
+  pensumCodes?: Set<string>;
 }
 
 /** "unknown": the data has nothing to evaluate (no code, no requirements) —
@@ -109,6 +147,7 @@ export function electiveState(e: ElectiveDTO, ctx: ElectiveCtx, livePrereqText?:
   if (code && ctx.approved.has(code)) return "seen";
   if (!electiveEvaluable(e, livePrereqText)) return "unknown";
   if (ctx.pregrado && graduateOnly(e.registroLevel)) return "blocked";
+  if (restrictionFor({ programRestriction: e.programRestriction, levelRestriction: e.registroLevel }, ctx.programCode)) return "blocked";
   const tree = electiveTree(e, livePrereqText);
   const together = new Set([...ctx.approved, ...ctx.cart]);
   if (!satisfied(tree, ctx.approved, requiredCourseCodes(tree), (c) => together.has(c))) return "blocked";
@@ -126,7 +165,7 @@ export function slotOpenness(
 ): SlotOpenness {
   const kind = slot.placeholderKind ?? "";
   if (kind === "EFI" || kind === "CLE" || isEfiLabel(slot)) return { open: true, reason: "always" };
-  const catalog = slotCatalog(electives, programCode, slot);
+  const catalog = slotCatalog(electives, programCode, slot, ctx.pensumCodes);
   const evaluable = catalog.filter((e) => electiveEvaluable(e));
   if (evaluable.length === 0) return { open: true, reason: "unevaluable" };
   return evaluable.some((e) => electiveState(e, ctx) === "now" || electiveState(e, ctx) === "seen")
@@ -152,3 +191,29 @@ export function slotOpenMap(courses: Course[], electives: ElectiveDTO[], program
   }
   return out;
 }
+
+/** What's missing, as groups: a single course, or "uno de" a set of
+ * alternatives (an OR the student hasn't met — MAIA 4342 asks for ISIS 2007
+ * OR IELE 2300). Registro tokens (EXMA1 …) are left out of the alternatives. */
+export function missingGroups(tree: ReqNode | null, ok: (code: string) => boolean, required: Set<string>): string[][] {
+  if (!tree) return [];
+  // same reading as availability.satisfied: an OR ignores alternatives with no
+  // required course (tokens), unless none has one
+  const leaves0 = (n: ReqNode): boolean => (n.op === "COURSE" ? required.has(n.code!) : (n.items ?? []).some(leaves0));
+  const met = (n: ReqNode): boolean => {
+    if (n.op === "COURSE") return !required.has(n.code!) || ok(n.code!);
+    if (n.op === "AND") return (n.items ?? []).every(met);
+    const rel = (n.items ?? []).filter(leaves0);
+    return rel.length === 0 || rel.some(met);
+  };
+  const leaves = (n: ReqNode): string[] => (n.op === "COURSE" ? (required.has(n.code!) ? [n.code!] : []) : (n.items ?? []).flatMap(leaves));
+  const walk = (n: ReqNode): string[][] => {
+    if (met(n)) return [];
+    if (n.op === "COURSE") return [[n.code!]];
+    if (n.op === "AND") return (n.items ?? []).flatMap(walk);
+    const opts = [...new Set((n.items ?? []).flatMap(leaves))];
+    return opts.length ? [opts] : [];
+  };
+  return walk(tree);
+}
+

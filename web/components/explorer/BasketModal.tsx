@@ -26,6 +26,7 @@ import {
   type SectionsResponse,
 } from "@/lib/sections";
 import { termLabel } from "@/lib/term";
+import type { CartWarning } from "@/lib/planning";
 import { groupColor, groupOf, toSentenceCase } from "./format";
 import { TypeGlyph } from "./CourseCard";
 import { ArrowRightIcon, BackIcon, BasketIcon, CheckIcon, ChevronDownIcon, CloseIcon, CopyIcon, ExternalIcon, ShareIcon } from "./icons";
@@ -56,6 +57,10 @@ interface Props {
   onAdd: (id: string) => void;
   /** step 0 was shown for this cart → the map can show its markers */
   onStepZeroShown: () => void;
+  /** cart courses added without their requirements (lib/planning.ts cartWarnings) */
+  warnings?: CartWarning[];
+  /** code → name for requirements outside the plan */
+  codeNames?: Record<string, string>;
   mihorarioUrl: string;
   onClose: () => void;
   onRemove: (id: string) => void;
@@ -116,6 +121,8 @@ export default function BasketModal({
   zero,
   onAdd,
   onStepZeroShown,
+  warnings = [],
+  codeNames = {},
   mihorarioUrl,
   onClose,
   onRemove,
@@ -399,6 +406,7 @@ export default function BasketModal({
         </header>
 
         <div className={styles.bkScroll} ref={scrollRef}>
+          {warnings.length > 0 && <CartWarningsBox warnings={warnings} codeNames={codeNames} />}
           {stage === "zero" ? (
             <StepZeroView zero={zero} onAdd={onAdd} />
           ) : stage === "review" ? (
@@ -624,6 +632,36 @@ export default function BasketModal({
         </footer>
       </div>
     </div>
+  );
+}
+
+/* ========================================================================== */
+/* Release gate 1: courses added without their requirements                    */
+/* ========================================================================== */
+
+function CartWarningsBox({ warnings, codeNames }: { warnings: CartWarning[]; codeNames: Record<string, string> }) {
+  const name = (c: Course) => toSentenceCase(c.name);
+  const ext = (code: string) => toSentenceCase(codeNames[code] ?? code.replace(/^([A-Z]+)(\d)/, "$1 $2"));
+  return (
+    <section className={styles.bkWarnBox} role="alert" aria-label="Materias sin sus requisitos">
+      <strong>Agregaste materias sin cumplir sus requisitos</strong>
+      <ul>
+        {warnings.map((w) => {
+          const parts: string[] = [];
+          if (w.missing.length) parts.push(`falta aprobar ${w.missing.map(name).join(", ")}`);
+          if (w.together.length) parts.push(`${w.together.map(name).join(", ")} debe estar aprobada o en tu canasta`);
+          if (w.external.length) parts.push(`falta ${w.external.map(ext).join(", ")}`);
+          if (w.creditsShort > 0) parts.push(`te faltan ${w.creditsShort} créditos aprobados`);
+          if (w.restrictedTo) parts.push(`Registro la limita a ${w.restrictedTo}`);
+          return (
+            <li key={w.course.id}>
+              <strong>{name(w.course)}</strong> ({parts.join("; ") || "no cumples una regla del plan"})
+            </li>
+          );
+        })}
+      </ul>
+      <span>Puedes seguir igual (por ejemplo, si tienes una homologación); confírmalo con tu coordinador.</span>
+    </section>
   );
 }
 

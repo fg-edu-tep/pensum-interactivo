@@ -17,8 +17,8 @@ interface Props {
   courses: Course[];
   /** "Estoy empezando": nothing marked, start from zero */
   onStartFresh: () => void;
-  /** "Ya terminé…": open the by-semester setup with this semester preselected */
-  onPickSemester: (semester: number) => void;
+  /** "Ya terminé…": open the by-semester setup with I … `lastFinished` preselected */
+  onPickFinished: (lastFinished: number) => void;
   /** "Voy distinto al plan": mark course by course */
   onByCourse: () => void;
   /** "Solo quiero mirar" / close */
@@ -27,7 +27,7 @@ interface Props {
   onTour: () => void;
 }
 
-export default function AvanceWelcome({ courses, onStartFresh, onPickSemester, onByCourse, onLookAround, onTour }: Props) {
+export default function AvanceWelcome({ courses, onStartFresh, onPickFinished, onByCourse, onLookAround, onTour }: Props) {
   const maxSemester = useMemo(
     () => Math.max(1, ...courses.filter((c) => !c.isPlaceholder).map((c) => c.semester)),
     [courses]
@@ -86,20 +86,20 @@ export default function AvanceWelcome({ courses, onStartFresh, onPickSemester, o
             <div className={`${styles.awOption} ${picking ? styles.awOptionOpen : ""}`}>
               <button type="button" className={styles.awOptionHead} aria-expanded={picking} onClick={() => setPicking((p) => !p)}>
                 <strong>Ya terminé uno o más semestres</strong>
-                <span>Dinos cuál vas a cursar ahora: marcamos lo anterior y tú corriges las excepciones.</span>
+                <span>Dinos qué semestres ya terminaste: marcamos sus cursos como vistos y tú corriges las excepciones.</span>
               </button>
               {picking && (
                 <div className={styles.awPicker}>
-                  <span className={styles.awPickerLabel}>El semestre que voy a cursar es</span>
-                  <div className={styles.awChips} role="group" aria-label="Semestre que vas a cursar">
-                    {Array.from({ length: maxSemester - 1 }, (_, i) => i + 2).map((n) => (
+                  <span className={styles.awPickerLabel}>¿Qué semestres ya terminaste? Del I al…</span>
+                  <div className={styles.awChips} role="group" aria-label="Último semestre que terminaste">
+                    {Array.from({ length: maxSemester - 1 }, (_, i) => i + 1).map((n) => (
                       <button key={n} type="button" aria-pressed={semester === n} className={`${styles.awChip} ${semester === n ? styles.awChipOn : ""}`} onClick={() => setSemester(n)}>
                         {ROMAN[n]}
                       </button>
                     ))}
                   </div>
-                  <button type="button" className={styles.btnPrimary} disabled={semester === null} onClick={() => semester !== null && onPickSemester(semester)}>
-                    {semester === null ? "Elige un semestre" : `Continuar: marcar I–${ROMAN[semester - 1]}`}
+                  <button type="button" className={styles.btnPrimary} disabled={semester === null} onClick={() => semester !== null && onPickFinished(semester)}>
+                    {semester === null ? "Elige un semestre" : semester === 1 ? "Continuar: marcar el semestre I" : `Continuar: marcar I–${ROMAN[semester]}`}
                   </button>
                 </div>
               )}
