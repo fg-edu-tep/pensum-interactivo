@@ -1,23 +1,15 @@
-// "Desbloqueo por créditos": slots of the pensum that only read as available in
-// Mi avance once the student has declared enough approved credits. It's a UX
-// choice (a first-semester student shouldn't see every elective as "you can
-// take this now"), not a business rule: below the threshold the slot simply
-// shows the ordinary grey "not yet" state — no lock, no reason text — and it
-// can still be marked as seen. Stored as gates in Catalog.rules.gates that
-// select slots by `appliesTo.placeholderKinds` with `condition.minCredits`;
-// lib/availability.ts `creditPending` reads them (evaluateGates skips them).
+// "Desbloqueo por créditos": an OPTIONAL admin tool. A slot type (EFI,
+// electivas, CLE, curso integrador, CBU) can be given a number of declared
+// approved credits below which it reads as "aún no" in Mi avance — a UX state,
+// never a lock. Stored as gates in Catalog.rules.gates that select slots by
+// `appliesTo.placeholderKinds` with `condition.minCredits`; read by
+// lib/availability.ts `creditPending` (evaluateGates skips them).
 //
-// Defaults for the pregrado plans (the coordinators' numbers, editable in
-// /administrador → plan → Reglas):
-//   EFI (Electiva en Fundamentos de Ingeniería)  75 créditos
-//   Electivas IELE                                80 créditos
-//   Curso de libre elección + Curso integrador    40 créditos
-//
-// They're added with `withRuleDefaults` wherever rules are read (the
-// student payload, the admin editor, the seed) until the plan is marked
-// `creditUnlocksSeeded` — which the seed and every admin save do — so a
-// threshold an admin deletes stays deleted and production gets the defaults
-// without a re-seed.
+// There are NO defaults any more (2026-10-29): elective slots are enabled by
+// requirement (lib/electiveAvailability.ts). The thresholds seeded on
+// 2026-10-22 (EFI 75, electivas 80, CLE + CI 40) are removed once from every
+// plan by `withRuleDefaults` (flag `creditUnlocksRetired`); anything an admin
+// adds afterwards is kept.
 
 import type { CatalogRules, GateRule } from "./types";
 import { SECOND_LANGUAGE_ATTESTATION } from "./catalogRules";
@@ -36,40 +28,33 @@ export function creditUnlockLabel(minCredits: number): string {
   return `Se habilita con ${minCredits} créditos aprobados`;
 }
 
-function unlock(id: string, kinds: string[], minCredits: number): GateRule {
-  return { id, label: creditUnlockLabel(minCredits), appliesTo: { placeholderKinds: kinds }, condition: { minCredits } };
-}
-
-export const CREDIT_UNLOCK_DEFAULTS: GateRule[] = [
-  unlock("creditos-efi", ["EFI"], 75),
-  unlock("creditos-electivas", ["ELECTIVA"], 80),
-  unlock("creditos-cle-ci", ["CLE", "CI"], 40),
-];
+/** the 2026-10-22 defaults, now retired (see the header) */
+export const RETIRED_DEFAULT_IDS = new Set(["creditos-efi", "creditos-electivas", "creditos-cle-ci"]);
 
 /** A gate edited in the "Desbloqueo por créditos" table: slots + min credits. */
 export function isCreditUnlock(g: GateRule): boolean {
   return (g.appliesTo?.placeholderKinds?.length ?? 0) > 0;
 }
 
-/** Maestrías are out: an 80-credit threshold would lock a 36–40 credit plan forever. */
-export function takesCreditUnlockDefaults(catalog: OrderableCatalog): boolean {
+/** Pregrado-only defaults (the second-language requirement); maestrías are out. */
+export function takesPregradoDefaults(catalog: OrderableCatalog): boolean {
   return catalogFamilyRank(catalog) < 3;
 }
 
-/** Pregrado defaults added to plans that predate them, once each (the flag
- * keeps an admin's later deletion): the credit thresholds and the
- * "Requisito segundo idioma" attestation (placed after the English one). */
+/** Rule migrations applied wherever rules are read (student payload, admin
+ * editor, seed), once each — the flag keeps an admin's later changes:
+ *   - the retired credit-threshold defaults are removed (all plans);
+ *   - pregrado plans get the "Requisito segundo idioma" attestation. */
 export function withRuleDefaults(rules: CatalogRules, catalog: OrderableCatalog): CatalogRules {
-  if (!takesCreditUnlockDefaults(catalog)) return rules;
   let out = rules;
-  if (!out.creditUnlocksSeeded) {
-    const have = new Set((out.gates ?? []).map((g) => g.id));
+  if (!out.creditUnlocksRetired) {
     out = {
       ...out,
-      gates: [...(out.gates ?? []), ...CREDIT_UNLOCK_DEFAULTS.filter((d) => !have.has(d.id))],
-      creditUnlocksSeeded: true,
+      gates: (out.gates ?? []).filter((g) => !RETIRED_DEFAULT_IDS.has(g.id)),
+      creditUnlocksRetired: true,
     };
   }
+  if (!takesPregradoDefaults(catalog)) return out;
   if (!out.secondLanguageSeeded) {
     const atts = [...(out.attestations ?? [])];
     if (!atts.some((a) => a.id === SECOND_LANGUAGE_ATTESTATION.id)) {

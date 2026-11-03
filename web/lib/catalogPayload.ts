@@ -4,7 +4,10 @@
 // from the stored prereq/coreq trees.
 
 import { prisma } from "./db";
-import { termLabel } from "./term";
+import { termLabel, termFromDate, planTerm } from "./term";
+import { planningTermSetting } from "./import/official/settings";
+import { ENGLISH_REQ_CODE_RE, LEGACY_ENGLISH_REQ_CODE_SOURCE } from "./types";
+import { parseRequirement } from "./import/requirementParser";
 import { sortCatalogs } from "./catalogOrder";
 import { withRuleDefaults } from "./creditUnlocks";
 import type {
@@ -160,6 +163,13 @@ export async function buildCatalogPayload(slug: string): Promise<CatalogPayload 
       coreqSourceTerm: co.sourceTerm,
       coreqTitles,
       restrictions,
+      minCredits: cc.isPlaceholder ? null : (cc.course?.minCredits ?? null),
+      minCreditsSemesters: cc.isPlaceholder ? null : (cc.course?.minCreditsSemesters ?? null),
+      lastOfferedTerm: cc.course?.lastOfferedTerm ?? null,
+      nextOfferingTerm: cc.course?.nextOfferingTerm ?? null,
+      programRestriction: cc.isPlaceholder ? null : (cc.course?.programRestriction ?? null),
+      levelRestriction: cc.isPlaceholder ? null : (cc.course?.levelRestriction ?? null),
+      offeringProjection: cc.isPlaceholder ? null : (cc.course?.offeringProjection ?? null),
     };
   });
 
@@ -171,7 +181,9 @@ export async function buildCatalogPayload(slug: string): Promise<CatalogPayload 
     const linked = new Set(
       ((rn.linkedCourseCodes as string[] | null) ?? []).map(String)
     );
-    const re = safeRe(rn.autoLinkRegex);
+    // rows bootstrapped before 2026-11 carry the old regex, which also caught
+    // LENG 1512 (Spanish writing) — read them as the English-only one
+    const re = safeRe(rn.autoLinkRegex === LEGACY_ENGLISH_REQ_CODE_SOURCE ? ENGLISH_REQ_CODE_RE.source : rn.autoLinkRegex);
     for (const c of courses) {
       let attach = linked.has(c.codeNormalized);
       if (re && c.prereqExternal.some((code) => re.test(code))) {
@@ -222,23 +234,34 @@ export async function buildCatalogPayload(slug: string): Promise<CatalogPayload 
     });
   }
 
+  // the two periods a student can look at: the calendar's and the one the
+  // official load opened for planning (before any load: the next regular one)
+  const current = termFromDate();
+  const planning = (await planningTermSetting()) ?? (catalog.term > current ? catalog.term : planTerm());
+  const offeringsFor = (term: string): Record<string, OfferingBadge> => {
+    const out: Record<string, OfferingBadge> = {};
+    for (const { cc, codeNormalized } of rows) {
+      if (cc.isPlaceholder || !cc.course) continue;
+      const off = cc.course.offerings.find((o) => o.term === term);
+      if (!off) continue;
+      const min = off.seatsAvailableMin;
+      const max = off.seatsAvailableMax;
+      out[codeNormalized] = {
+        offered: off.offered,
+        sectionCount: off.sectionCount,
+        seatsAvailable: min != null && max != null ? [min, max] : undefined,
+        attrs: (off.attrs as string[] | null) ?? [],
+        ptrm: (off.ptrmSet as string[] | null) ?? [],
+        syncFailed: off.source !== "archivo" && (cc.pairingStatus === "sync_failed" || !!off.syncError),
+        source: off.source,
+      };
+    }
+    return out;
+  };
   // offerings for this catalog's term, keyed by codeNormalized
-  const offerings: Record<string, OfferingBadge> = {};
-  for (const { cc, codeNormalized } of rows) {
-    if (cc.isPlaceholder || !cc.course) continue;
-    const off = cc.course.offerings.find((o) => o.term === catalog.term);
-    if (!off) continue;
-    const min = off.seatsAvailableMin;
-    const max = off.seatsAvailableMax;
-    offerings[codeNormalized] = {
-      offered: off.offered,
-      sectionCount: off.sectionCount,
-      seatsAvailable: min != null && max != null ? [min, max] : undefined,
-      attrs: (off.attrs as string[] | null) ?? [],
-      ptrm: (off.ptrmSet as string[] | null) ?? [],
-      syncFailed: cc.pairingStatus === "sync_failed" || !!off.syncError,
-    };
-  }
+  const offerings = offeringsFor(catalog.term);
+  const offeringsByTerm: Record<string, Record<string, OfferingBadge>> = {};
+  for (const t of new Set([current, planning, catalog.term])) offeringsByTerm[t] = t === catalog.term ? offerings : offeringsFor(t);
 
   const siblings = sortCatalogs(
     await prisma.catalog.findMany({
@@ -262,7 +285,32 @@ export async function buildCatalogPayload(slug: string): Promise<CatalogPayload 
     lastOfferedTerm: e.lastOfferedTerm,
     registroCredits: e.registroCredits,
     registroPrereqText: e.registroPrereqText,
+    minCredits: e.minCredits,
+    nextOfferingTerm: e.nextOfferingTerm,
+    registroLevel: e.registroLevel,
+    attrs: (e.attrs as unknown as ElectiveDTO["attrs"]) ?? null,
+    programRestriction: e.programRestriction,
+    projection: e.projection,
+    coreqText: e.coreqText,
   }));
+
+  // names for every code a requirement mentions ("Aún no: necesitas …")
+  const mentioned = new Set<string>();
+  for (const c of courses) {
+    for (const code of collectCourseCodes(c.prereqTree)) mentioned.add(code);
+    for (const code of collectCourseCodes(c.coreqTree)) mentioned.add(code);
+  }
+  for (const e of electives) for (const code of collectCourseCodes(parseRequirement(e.registroPrereqText ?? ""))) mentioned.add(code);
+  const codeNames: Record<string, string> = {};
+  if (mentioned.size) {
+    try {
+      for (const n of await prisma.codeName.findMany({ where: { code: { in: [...mentioned] } }, select: { code: true, name: true } }))
+        codeNames[n.code] = n.name;
+    } catch {
+      /* table not migrated yet */
+    }
+    for (const c of courses) if (mentioned.has(c.codeNormalized) && !c.isPlaceholder) codeNames[c.codeNormalized] = c.name;
+  }
 
   return {
     generatedAt: new Date().toISOString(),
@@ -292,5 +340,8 @@ export async function buildCatalogPayload(slug: string): Promise<CatalogPayload 
       catalog
     ),
     requirementNodes,
+    terms: { current, planning },
+    offeringsByTerm,
+    codeNames,
   };
 }

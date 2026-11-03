@@ -1,5 +1,7 @@
 "use client";
 
+import { termLabel } from "@/lib/term";
+import type { BoxHalf } from "@/lib/electiveBoxes";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactFlow, {
   Background,
@@ -142,6 +144,13 @@ interface Props {
   plannedIds: Map<string, string>; // courseId -> term
   stagedIds: Set<string>;
   justUnlockedIds: Set<string>;
+  /** "La vas a poder ver": next-semester courses from the last checkout step 0 */
+  nextIds: Set<string>;
+  /** "Qué se me habilita" for the selected course (lib/planning.ts wouldEnable):
+   * course id → this same semester ("now") or the next one */
+  habilita?: Map<string, "now" | "next">;
+  /** half-box electives: what fills each half of each elective box */
+  halvesByBox?: Map<string, [BoxHalf | null, BoxHalf | null]>;
   quickMode: boolean;
   relaciones: RelacionesMode;
   /** which relations to draw around the selected course (forward ones are opt-in) */
@@ -163,10 +172,13 @@ export default function MapCanvas({
   plannedIds,
   stagedIds,
   justUnlockedIds,
+  nextIds,
   quickMode,
   relaciones,
   view,
   onViewChange,
+  habilita,
+  halvesByBox,
   panelOpen,
   onSelect,
   onHover,
@@ -269,9 +281,15 @@ export default function MapCanvas({
     if (unlockView === "off") return EMPTY_MAP;
     if (unlockView === "all") return unlockById;
     const m = new Map<string, RelationState>();
+    if (habilita) {
+      // "Qué se me habilita": what passing / taking this course opens, given the
+      // student's progress — this same semester or the next
+      for (const id of habilita.keys()) m.set(id, "unlockSole");
+      return m;
+    }
     for (const [id, rel] of unlockById) if (rel === "unlockSole") m.set(id, rel);
     return m;
-  }, [unlockView, unlockById]);
+  }, [unlockView, unlockById, habilita]);
   const downstreamShown = useMemo(() => (unlockView === "all" ? downstream : EMPTY_SET), [unlockView, downstream]);
 
   const selUpstream = useMemo(() => (selectedId ? upstreamAll : EMPTY_SET), [selectedId, upstreamAll]);
@@ -385,6 +403,8 @@ export default function MapCanvas({
             reqNumber: selectedId && showNeeds ? reqNumberByCourseId.get(course.id) ?? null : null,
             isStaged: stagedIds.has(course.id),
             isJustUnlocked: justUnlockedIds.has(course.id),
+            isNext: mode === "progress" && nextIds.has(course.id),
+            halves: halvesByBox?.get(course.id) ?? null,
             isDimmed,
             onClick: onSelect,
             onHover: handleHover,
@@ -412,6 +432,8 @@ export default function MapCanvas({
     plannedIds,
     stagedIds,
     justUnlockedIds,
+    nextIds,
+    halvesByBox,
     quickMode,
     reqNumberByCourseId,
     onSelect,
@@ -491,20 +513,24 @@ export default function MapCanvas({
   // numbers shown next to the three relation toggles + one quiet sentence
   const relCounts = useMemo(() => {
     if (!selected) return { needs: 0, unlocks: 0, depends: 0 };
-    const sole = [...unlockById.values()].filter((r) => r === "unlockSole").length;
+    const sole = habilita ? habilita.size : [...unlockById.values()].filter((r) => r === "unlockSole").length;
     return {
       needs: relaciones === "cadena" ? upstreamAll.size : selected.prereqCourseIds.length,
       unlocks: sole,
       depends: downstream.size,
     };
   }, [selected, unlockById, relaciones, upstreamAll, downstream]);
+  const habNow = habilita ? [...habilita.values()].filter((v) => v === "now").length : 0;
+  const habNext = habilita ? habilita.size - habNow : 0;
   const relNote = !selected
     ? ""
-    : relCounts.depends === 0
-      ? "Ningún curso del pensum depende de este."
-      : relCounts.unlocks === 0
-        ? `Por sí solo no desbloquea ninguno, pero ${relCounts.depends} curso${relCounts.depends === 1 ? "" : "s"} del pensum dependen de él.`
-        : `Aprobarlo basta para desbloquear ${relCounts.unlocks} curso${relCounts.unlocks === 1 ? "" : "s"}; ${relCounts.depends} dependen de él en total.`;
+    : activeRelKey(view) === "unlocks" && habilita
+      ? relCounts.unlocks === 0
+        ? "Con tu avance actual, este curso no te habilita otro por sí solo."
+        : `Este mismo semestre (por correquisito): ${habNow} · El próximo semestre: ${habNext}.`
+      : relCounts.depends === 0
+        ? "Ningún curso del pensum depende de este."
+        : `${relCounts.depends} curso${relCounts.depends === 1 ? "" : "s"} del pensum dependen de él${relCounts.unlocks > 0 ? `; ${relCounts.unlocks} se te habilita${relCounts.unlocks === 1 ? "" : "n"} con él` : ""}.`;
 
   // MAP-05: fade + pan-to-hidden-semester chips at each edge that's cut off.
   const semesterCount = useMemo(() => new Set(courses.map((c) => c.semester)).size, [courses]);
@@ -577,9 +603,19 @@ export default function MapCanvas({
         >
           <div className={styles.tooltipTitle}>{toSentenceCase(focusCourse.name)}</div>
           <div className={styles.tooltipMeta}>
-            {directAncestors.size} requisito{directAncestors.size === 1 ? "" : "s"} · Desbloquea{" "}
+            {directAncestors.size} requisito{directAncestors.size === 1 ? "" : "s"} · Lo piden{" "}
             {[...unlockById.values()].filter(Boolean).length} · {focusCourse.credits} cr
           </div>
+          {(focusCourse.lastOfferedTerm || focusCourse.nextOfferingTerm) && (
+            <div className={styles.tooltipMeta}>
+              {[
+                focusCourse.lastOfferedTerm ? `Última vez ofrecida: ${termLabel(focusCourse.lastOfferedTerm)}` : null,
+                focusCourse.nextOfferingTerm ? `Próxima oferta planeada: ${termLabel(focusCourse.nextOfferingTerm)}` : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </div>
+          )}
           <div className={styles.tooltipHint}>Clic para ver su ruta completa</div>
         </div>
       )}

@@ -8,7 +8,9 @@ import type {
   ElectiveDTO,
   OfferingBadge,
 } from "@/lib/types";
-import ElectivePicker from "./ElectivePicker";
+import ElectivePicker, { projectionText } from "./ElectivePicker";
+import type { BagItem, BagLayout } from "@/lib/electiveBag";
+import { restrictionFor } from "@/lib/planning";
 import EngineeringElectivePicker from "./EngineeringElectivePicker";
 import ChainMiniature from "./ChainMiniature";
 import RequirementTree from "./RequirementTree";
@@ -64,6 +66,15 @@ function DescriptionBlock({ text }: { text: string }) {
   );
 }
 
+/** "Próxima oferta proyectada: 2028-1" (the department's bag, PROXIMO). The
+ * last period taught is secondary (agreed 2026-10-29): see lastOfferedLine. */
+export function offeringDates(c: Pick<Course, "lastOfferedTerm" | "nextOfferingTerm" | "offeringProjection">): string | null {
+  return projectionText({ projection: c.offeringProjection ?? null, nextOfferingTerm: c.nextOfferingTerm ?? null, frequency: null });
+}
+export function lastOfferedLine(c: Pick<Course, "lastOfferedTerm">): string | null {
+  return c.lastOfferedTerm ? `Última vez dictada: ${termShort(c.lastOfferedTerm)}` : null;
+}
+
 /** Where the requirements shown come from (lib/requirementResolve.ts priority). */
 function sourceLine(course: Course, term: string): string | null {
   switch (course.prereqSource) {
@@ -100,6 +111,13 @@ interface Props {
   approved: Set<string>;
   isPlanned: boolean;
   plannable: boolean;
+  /** cart ids and credits(A), for the elective picker's "Puedes tomarla" */
+  cart: Set<string>;
+  approvedCredits: number;
+  /** missing requirements when adding to the cart anyway ("Ojo: no has aprobado …") */
+  planWarning: string[];
+  /** the course API is down: no cart (see useOfertaStatus) */
+  planningBlocked?: boolean;
   offering: OfferingBadge | undefined;
   term: string;
   mihorarioUrl: string;
@@ -115,6 +133,16 @@ interface Props {
   onSelectCourse: (id: string) => void;
   onCollapse: () => void;
   onClose: () => void;
+  /** the elective bag (lib/electiveBag.ts) — for the 2-credit ELECTIVA boxes */
+  bag?: BagItem[];
+  bagLayout?: BagLayout;
+  isBox?: boolean;
+  boxOccupants?: string[];
+  onBagAdd?: (item: Omit<BagItem, "key"> & { key?: string }, as: "planned" | "approved") => void;
+  onBagRemove?: (key: string) => void;
+  bagState?: (key: string) => "approved" | "planned" | "chosen";
+  /** code → name for requirements outside the plan */
+  codeNames?: Record<string, string>;
 }
 
 export default function SidePanel({
@@ -129,6 +157,10 @@ export default function SidePanel({
   approved,
   isPlanned,
   plannable,
+  cart,
+  approvedCredits,
+  planWarning,
+  planningBlocked = false,
   offering,
   term,
   mihorarioUrl,
@@ -144,6 +176,14 @@ export default function SidePanel({
   onSelectCourse,
   onCollapse,
   onClose,
+  bag,
+  bagLayout,
+  isBox = false,
+  boxOccupants = [],
+  onBagAdd,
+  onBagRemove,
+  bagState,
+  codeNames,
 }: Props) {
   if (!course) {
     return (
@@ -276,16 +316,26 @@ export default function SidePanel({
                 <span className={`${styles.offerDot} ${styleKey}`} />
                 {label}
               </div>
-              {offerState === "offered" && (
+              {offerState === "offered" && offering!.source !== "archivo" && (
                 <div className={styles.offerDetail}>
                   {offering!.sectionCount} sección(es)
                   {seatsText(offering!.seatsAvailable)}
                 </div>
               )}
+              {offering?.source === "archivo" && (
+                <div className={styles.offerDetail}>Según la carga del departamento (los horarios salen en la oferta en línea).</div>
+              )}
               {offerState === "unknown" && (
                 <div className={styles.offerDetail}>
                   No pudimos confirmar si se dicta este periodo — revisa directamente.
                 </div>
+              )}
+              {offeringDates(course) && <div className={styles.offerDetail}>{offeringDates(course)}</div>}
+              {lastOfferedLine(course) && (
+                <details className={styles.offerMore}>
+                  <summary>Más detalles</summary>
+                  {lastOfferedLine(course)} (según los datos de Registro disponibles).
+                </details>
               )}
               {link && (
                 <a href={link} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 8, fontSize: 12, fontWeight: 600, color: "var(--accent)" }}>
@@ -305,6 +355,8 @@ export default function SidePanel({
               mode={mode}
               approved={approved}
               onSelectCourse={onSelectCourse}
+              approvedCredits={approvedCredits}
+              codeNames={codeNames}
             />
             {sourceLine(course, term) && <p className={styles.requirementSource}>{sourceLine(course, term)}</p>}
           </div>
@@ -318,6 +370,13 @@ export default function SidePanel({
               : course.coreqCourseIds.map((id) => allCourses.find((c) => c.id === id)?.code).filter(Boolean).join(", ")}
             {" · debes inscribirlos al tiempo"}
           </p>
+        )}
+
+        {!course.isPlaceholder && restrictionFor(course, programCode) && (
+          <div className={styles.gateBox}>
+            <h3>Registro la limita</h3>
+            <p style={{ margin: 0, fontSize: 12.5 }}>Solo para: {restrictionFor(course, programCode)}. Con tu plan no la puedes inscribir.</p>
+          </div>
         )}
 
         {course.restrictions && course.restrictions.length > 0 && (
@@ -365,6 +424,24 @@ export default function SidePanel({
               approved={approved}
               catalogCodes={catalogCodes}
               onSelectCourse={onSelectCourse}
+              cart={cart}
+              approvedCredits={approvedCredits}
+              slot={course}
+              codeNames={codeNames}
+              bag={
+                isBox && bag && bagLayout && onBagAdd && onBagRemove && bagState
+                  ? {
+                      items: bag,
+                      layout: bagLayout,
+                      occupants: boxOccupants,
+                      state: bagState,
+                      onAdd: onBagAdd,
+                      onRemove: onBagRemove,
+                      planningBlocked,
+                      planLabel: nextTermShort(),
+                    }
+                  : undefined
+              }
             />
           </div>
         )}
@@ -374,9 +451,10 @@ export default function SidePanel({
             <h3>Oferta de CBU</h3>
             <p style={{ fontSize: 12.5, color: "var(--muted)" }}>Elige un Ciclo Básico Uniandino vigente que aún no hayas cursado.</p>
             <div className={styles.cbuRules}>
-              <strong>Ojo con la combinación de CBU</strong>
+              <strong>Ojo con la combinación de CBU (5 en total)</strong>
               <ul>
-                <li>1 CBU de Colombia</li>
+                <li>1 CBU Colombia</li>
+                <li>2 CBU de áreas diferentes</li>
                 <li>2 CBU libres</li>
               </ul>
               <a href={CBU_RULES_URL} target="_blank" rel="noopener noreferrer">
@@ -392,7 +470,14 @@ export default function SidePanel({
         {isCleSlot && (
           <div className={styles.sectionGap} style={{ borderLeft: "3px solid var(--t-req)", paddingLeft: 10 }}>
             <h3>Curso de libre elección</h3>
-            <p style={{ fontSize: 12.5, color: "var(--muted)" }}>Cualquier curso Uniandes que no hayas tomado homologa para este espacio.</p>
+            <p style={{ fontSize: 12.5, color: "var(--muted)" }}>
+              Puedes completarlo con el curso que quieras: un curso de cualquier departamento de Uniandes, un deporte,
+              un curso de un crédito… incluso varios cursos pequeños que sumen los créditos.
+            </p>
+            <p style={{ fontSize: 12.5, color: "var(--muted)" }}>
+              Aquí no lo agregas a la canasta: solo lo <strong>marcas como visto</strong> cuando lo completes. Sus créditos
+              cuentan para tus créditos aprobados totales, pero no para las bolsas de electivas.
+            </p>
             <a href={OFERTA_CURSOS_URL} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)", fontSize: 12.5, fontWeight: 600 }}>
               Explorar la oferta de cursos →
             </a>
@@ -415,10 +500,26 @@ export default function SidePanel({
             {/* Mi avance: real courses and CBU slots can go in the basket;
                 every course and slot can be marked as seen, locked or not
                 (homologaciones, cursos vistos fuera del orden sugerido). */}
-            {(!course.isPlaceholder || isCbuSlot) && (
+            {!course.isPlaceholder && planWarning.length > 0 && gateReasons.length === 0 && !isPlanned && (
+              <div className={styles.planWarn} role="alert">
+                <span className={styles.planWarnIcon} aria-hidden>
+                  <svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 3 2 21h20L12 3z" fill="currentColor" /><path d="M12 10v5M12 17.5v.5" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" /></svg>
+                </span>
+                <span>
+                  <strong>Ojo: no has aprobado {planWarning.join(", ")}.</strong> Puedes agregarla igual (por ejemplo, si
+                  tienes una homologación); te lo recordaremos al revisar tu canasta.
+                </span>
+              </div>
+            )}
+            {isBox && boxOccupants.length === 0 && (
+              <p className={styles.secondaryLine} style={{ margin: 0 }}>
+                Elige arriba la electiva que quieres agregar a tu canasta: la canasta guarda la materia, no la casilla.
+              </p>
+            )}
+            {(!course.isPlaceholder || isCbuSlot || (isElectiveSlot && !isBox && !!assignment)) && (
               <button
                 className={`${styles.btnPrimary} ${styles.btnFullRow}`}
-                disabled={!isPlanned && (gateReasons.length > 0 || !plannable)}
+                disabled={planningBlocked || (!isPlanned && (gateReasons.length > 0 || !plannable))}
                 title={
                   !isPlanned && gateReasons.length > 0
                     ? gateReasons.join(" · ")
@@ -429,7 +530,9 @@ export default function SidePanel({
                 onClick={() => onTogglePlanned(course.id, isPlanned ? null : nextTermCode())}
               >
                 {!isPlanned && plannable && gateReasons.length === 0 && <BasketIcon size={15} />}
-                {isPlanned
+                {planningBlocked
+                  ? "Canasta no disponible (oferta caída)"
+                  : isPlanned
                   ? "Quitar de la canasta"
                   : gateReasons.length > 0
                     ? "Aún bloqueado"
@@ -439,11 +542,11 @@ export default function SidePanel({
               </button>
             )}
             <button
-              className={!course.isPlaceholder || isCbuSlot ? styles.btnGhostFooter : styles.btnPrimary}
+              className={!course.isPlaceholder || isCbuSlot || (isElectiveSlot && !isBox && !!assignment) ? styles.btnGhostFooter : styles.btnPrimary}
               onClick={() => onToggleApproved(course.id)}
             >
               <CheckIcon />
-              Marcar como vista
+              {isBox && boxOccupants.length === 0 ? "Marcar como vista (sin especificar)" : isBox ? "Marcar lo de esta casilla como visto" : "Marcar como vista"}
             </button>
           </>
         )}

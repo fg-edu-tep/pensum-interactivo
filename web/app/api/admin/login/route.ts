@@ -35,7 +35,11 @@ export async function POST(req: Request) {
     );
   }
 
-  const user = await authenticate(username, password);
+  // a password pasted from an email often carries a trailing space/newline
+  // (2026-10-29 demo: the coordinator's credential "didn't match")
+  const user =
+    (await authenticate(username, password)) ??
+    (password.trim() !== password && password.trim() ? await authenticate(username, password.trim()) : null);
   if (!user) {
     // generic message — don't reveal whether the username exists or is disabled
     return NextResponse.json(

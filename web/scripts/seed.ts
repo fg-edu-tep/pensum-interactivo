@@ -17,7 +17,8 @@ try {
 }
 import { parsePensumWorkbook } from "../lib/import/parsePensumWorkbook";
 import { parsePrereqExport } from "../lib/import/parsePrereqExport";
-import { electiveHistory, nameIndex, parseRegistroHistory } from "../lib/import/electiveHistory";
+import { coverageGaps, electiveHistory, latestRow, nameIndex, parseRegistroHistory } from "../lib/import/electiveHistory";
+import { restrictionToCredits } from "../lib/import/restrictionCredits";
 import { persistParsedCatalog } from "../lib/import/persistCatalog";
 import { parseElectivesWorkbook } from "../lib/import/parseElectivesWorkbook";
 import { identityForSlug } from "../lib/catalogIdentity";
@@ -26,6 +27,8 @@ import { requirementNodesForSlug } from "../lib/requirementNodes";
 import { OfferingsCache } from "../lib/pairing/offeringsCache";
 import { prisma, applySqlitePragmas } from "../lib/db";
 import { resolveOfferingTerm } from "../lib/termResolve";
+import { prepareOfficialLoad } from "../lib/import/official/prepare";
+import { applyOfficialJob, createOfficialJob } from "../lib/import/official/apply";
 
 function findFile(dir: string, re: RegExp): string {
   const hits = readdirSync(dir).filter((f) => re.test(f));
@@ -44,8 +47,79 @@ function findFile(dir: string, re: RegExp): string {
   return join(dir, hits[0]);
 }
 
+/** Newest "<PREFIX>_<YYYYPP>.xlsx" in `dir`, or null. */
+function newestOfficial(dir: string, prefix: string): string | null {
+  try {
+    const hits = readdirSync(dir)
+      .filter((f) => new RegExp(`^${prefix}_?\\d{6}.*\\.xlsx$`, "i").test(f) && !f.startsWith("~$"))
+      .sort((a, b) => (a.match(/\d{6}/)?.[0] ?? "").localeCompare(b.match(/\d{6}/)?.[0] ?? ""));
+    return hits.length ? join(dir, hits[hits.length - 1]) : null;
+  } catch {
+    return null;
+  }
+}
+
+// The department's official files (from 2026-11): datos/PLANES_<term>.xlsx,
+// BOLSAS_<term>.xlsx, PRERREQUISITOS_<term>.xlsx — the same load the admin runs
+// from /administrador/carga (lib/import/official). Plans are diffed and applied
+// like an admin import (pinned fields kept, removed rows deleted), the elective
+// bag is replaced, restrictions / offering per period are rewritten.
+async function seedOfficial(dir: string): Promise<boolean> {
+  const planes = newestOfficial(dir, "PLANES");
+  const bolsas = newestOfficial(dir, "BOLSAS");
+  const requisitos = newestOfficial(dir, "PRERREQUISITOS");
+  if (!planes || !bolsas || !requisitos) return false;
+  const name = (p: string) => p.split("/").pop() ?? p;
+  console.log(`official : ${dir}`);
+  console.log(`  planes     ${name(planes)}\n  bolsas     ${name(bolsas)}\n  requisitos ${name(requisitos)}`);
+  const prep = prepareOfficialLoad({
+    planes: readFileSync(planes),
+    bolsas: readFileSync(bolsas),
+    requisitos: readFileSync(requisitos),
+    filenames: { planes: name(planes), bolsas: name(bolsas), requisitos: name(requisitos) },
+    planningTerm: process.env.PLANNING_TERM || undefined,
+    currentTerm: process.env.CURRENT_TERM || undefined,
+  });
+  const r = prep.report;
+  console.log(`  periodo actual ${r.currentTerm} · planeación ${r.planningTerm} · requisitos ${r.requisitosPeriods.join(", ")}`);
+  for (const p of r.plans)
+    console.log(`  · ${p.header.padEnd(15)} → ${p.slug.padEnd(13)} ${String(p.courses).padStart(2)} cursos + ${String(p.slots).padStart(2)} casillas · ${p.credits} cr · ${p.semesters} sem${p.status === "draft" ? " (borrador)" : ""}`);
+  console.log(`  laboratorios/complementarias como correquisito: ${r.companions}`);
+  console.log(`  restricción → créditos (${r.restrictions.length}):`);
+  for (const x of r.restrictions) console.log(`    · ${x.code} ${x.name} → ${x.minCredits} cr (${x.semesters === 1 ? "no primer semestre" : `excluye semestres 1–${x.semesters}`})`);
+  console.log(`  solo para otros programas: ${r.programOnly.map((x) => x.code).join(", ") || "—"}`);
+  console.log(`  solo posgrado: ${r.graduateOnly.map((x) => x.code).join(", ") || "—"}`);
+  console.log(`  bolsa: ${r.bolsas.total} cursos · proyección ${JSON.stringify(r.bolsas.projection)}`);
+  for (const [t, o] of Object.entries(r.offering))
+    console.log(`  oferta ${t}: ${o.offered} se dictan · ${o.notOffered} no · sin dato: ${o.unknown.join(", ") || "—"}`);
+  if (r.missingInRequisitos.length) console.log(`  sin fila en PRERREQUISITOS: ${r.missingInRequisitos.map((x) => x.code).join(", ")}`);
+  if (r.unparsed.length) console.log(`  ! requisitos que no se pudieron leer: ${r.unparsed.map((x) => `${x.code} (${x.field})`).join(", ")}`);
+  for (const w of r.warnings) console.log(`  ! ${w}`);
+
+  const { jobId, diff } = await createOfficialJob(prep, "seed");
+  console.log(`  diff de planes: +${diff.counts.added} −${diff.counts.removed} ~${diff.counts.modified} (conflictos ${diff.counts.conflicts})`);
+  const res = await applyOfficialJob(jobId, {
+    actor: "seed",
+    confirmRemovals: process.env.SEED_KEEP_REMOVED !== "1",
+    forceConflicts: process.env.SEED_FORCE_CONFLICTS === "1",
+  });
+  if (res.createdCatalogs.length) console.log(`  catálogos nuevos: ${res.createdCatalogs.join(", ")}`);
+  for (const c of res.planes?.perCatalog ?? [])
+    console.log(`  ✓ ${c.slug.padEnd(13)} +${c.added} ~${c.modified} −${c.removed} (sin cambio ${c.kept})`);
+  console.log(`  ✓ cursos ${res.courses} · filas de oferta ${res.offeringRows} · electivas ${res.electives.upserted} (−${res.electives.deleted}) · nombres ${res.names}`);
+  return true;
+}
+
 async function main() {
   const seedDir = resolve(process.cwd(), process.env.SEED_DIR ?? "..");
+  if (process.env.SEED_LEGACY !== "1") {
+    await applySqlitePragmas();
+    if (await seedOfficial(resolve(seedDir, process.env.OFFICIAL_DIR ?? "datos"))) {
+      console.log("\ndone.");
+      return;
+    }
+    console.log("no official files (datos/PLANES_*, BOLSAS_*, PRERREQUISITOS_*) — legacy seed\n");
+  }
   const resolved = await resolveOfferingTerm();
   const term = resolved.term;
   if (resolved.source !== "env" && term !== resolved.dateTerm) {
@@ -86,6 +160,9 @@ async function main() {
 
   const catalogs = parsePensumWorkbook(readFileSync(pensumPath));
   const prereqMap = parsePrereqExport(readFileSync(prereqPath), term);
+  // every period of the Registro export: restrictions, last period taught,
+  // electives' codes / frequency (lib/import/electiveHistory.ts)
+  const history = parseRegistroHistory(readFileSync(prereqPath));
   console.log(`\nparsed ${catalogs.length} catalogs, ${prereqMap.size} prereq rows\n`);
 
   const cache = new OfferingsCache();
@@ -125,6 +202,29 @@ async function main() {
     );
   }
 
+  // ---- Registro history → every course: "excluye semestres 1–n" as 15 × n
+  //      approved credits, and the newest period it was taught in ----
+  {
+    const converted: string[] = [];
+    for (const c of await prisma.course.findMany({ select: { id: true, normalizedCode: true, nextOfferingTerm: true } })) {
+      const row = latestRow(history, c.normalizedCode, term);
+      const r = restrictionToCredits(row?.restriction);
+      if (r) converted.push(`${c.normalizedCode} → ${r.minCredits} cr (excluye semestres 1–${r.semesters})`);
+      await prisma.course.update({
+        where: { id: c.id },
+        data: {
+          lastOfferedTerm: row?.period ?? null,
+          minCredits: r?.minCredits ?? null,
+          minCreditsSemesters: r?.semesters ?? null,
+          restrictionText: row?.restriction || null,
+        },
+      });
+    }
+    console.log(`
+restricción → créditos (${converted.length}):`);
+    for (const line of converted) console.log(`  · ${line}`);
+  }
+
   // ---- electives bag (Custom_Pensum/electivas/*.xlsx) ----
   const electivesDir = resolve(seedDir, process.env.ELECTIVAS_DIR ?? "electivas");
   let electiveFiles: string[] = [];
@@ -143,7 +243,6 @@ async function main() {
     );
     // fill what the bag leaves blank (code, last period taught, usual
     // semester, Registro prereqs/credits) from the full Registro history
-    const history = parseRegistroHistory(readFileSync(prereqPath));
     const index = nameIndex(history);
     const adminCodes = new Map(
       (await prisma.elective.findMany({ where: { codeSource: "admin" }, select: { normalizedName: true, code: true } })).map(
@@ -152,11 +251,13 @@ async function main() {
     );
     let withTerm = 0;
     let withCode = 0;
+    const electiveRestrictions: string[] = [];
     for (const e of parsedElectives) {
       if (e.offeredTerms.includes(term)) withTerm += 1;
       const adminCode = adminCodes.get(e.normalizedName) ?? null;
       const h = electiveHistory({ name: e.name, code: adminCode ?? e.code, frequency: e.frequency }, history, index, term);
       if (h.code) withCode += 1;
+      if (h.minCredits) electiveRestrictions.push(`${h.code} ${e.name} → ${h.minCredits} cr`);
       const hist = {
         code: h.code,
         codeSource: adminCode ? "admin" : h.codeSource,
@@ -166,6 +267,8 @@ async function main() {
         registroName: h.registroName,
         registroCredits: h.registroCredits,
         registroPrereqText: h.registroPrereqText,
+        minCredits: h.minCredits,
+        registroLevel: h.registroLevel,
       };
       await prisma.elective.upsert({
         where: { normalizedName: e.normalizedName },
@@ -197,6 +300,19 @@ async function main() {
     console.log(
       `  ✓ ${String(parsedElectives.length).padStart(3)} electives  (${withTerm} ofertadas en ${term}, ${withCode} con código)`
     );
+    console.log(`  restricción → créditos en electivas (${electiveRestrictions.length}):`);
+    for (const line of electiveRestrictions) console.log(`    · ${line}`);
+  }
+
+  // ---- coverage: pensum and elective codes with no Registro row since 2023 ----
+  {
+    const from = process.env.REGISTRO_WINDOW_FROM ?? "202310";
+    const pensum = (await prisma.course.findMany({ where: { catalogCourses: { some: {} } }, select: { normalizedCode: true } })).map((c) => c.normalizedCode);
+    const electives = (await prisma.elective.findMany({ where: { code: { not: null } }, select: { code: true } })).map((e) => e.code!);
+    const gaps = coverageGaps(history, [...pensum, ...electives], from, term);
+    console.log(`
+cobertura del Registro ${from}–${term}: ${gaps.length} código(s) sin fila${gaps.length ? ":" : ""}`);
+    for (const g of gaps) console.log(`  · ${g}`);
   }
 
   console.log("\ndone.");

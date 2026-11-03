@@ -39,6 +39,13 @@ export async function PATCH(
     // an admin-set code is kept by later seeds (they only fill blanks)
     data.codeSource = data.code ? "admin" : null;
   }
+  if ("nextOfferingTerm" in body) {
+    const t = String(body.nextOfferingTerm ?? "").trim();
+    if (t && !/^\d{4}(10|20|19)$/.test(t)) {
+      return NextResponse.json({ error: "Próxima oferta: usa el formato AAAAPP (p. ej. 202710)." }, { status: 400 });
+    }
+    data.nextOfferingTerm = t || null;
+  }
   if ("level" in body) data.level = String(body.level ?? "pregrado").trim() || "pregrado";
   if ("ciclo" in body) data.ciclo = String(body.ciclo ?? "").trim() || null;
   if ("isCursoIntegrador" in body) data.isCursoIntegrador = Boolean(body.isCursoIntegrador);

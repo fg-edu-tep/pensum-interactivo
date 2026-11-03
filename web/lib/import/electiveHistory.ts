@@ -16,12 +16,27 @@ import * as XLSX from "xlsx";
 import { normalizeCode } from "./normalizeCode";
 import { foldAccents, normalizeName } from "./textMatch";
 import type { Frequency } from "./parseElectivesWorkbook";
+import { restrictionToCredits } from "./restrictionCredits";
+
+/** Newest row at or before `term`. */
+export function latestRow(history: RegistroHistory, code: string, term: string): HistoryRow | null {
+  return (history.get(code) ?? []).find((r) => r.period <= term) ?? null;
+}
+
+/** Codes with no row in the window [fromTerm, term] — for the department's coverage check. */
+export function coverageGaps(history: RegistroHistory, codes: string[], fromTerm: string, term: string): string[] {
+  return [...new Set(codes)].filter((c) => !(history.get(c) ?? []).some((r) => r.period >= fromTerm && r.period <= term)).sort();
+}
 
 export interface HistoryRow {
   period: string;
   name: string;
   credits: number | null;
   prereqText: string;
+  /** "Restricción de periodo" (e.g. "EXCLUYE INGRESA A PRIMER SEMESTRE & …") */
+  restriction: string;
+  /** "Restricción de nivel" (e.g. "INCLUYE MAGISTER") */
+  level: string;
 }
 
 /** normalizedCode → rows, newest period first. */
@@ -39,6 +54,8 @@ export function parseRegistroHistory(buffer: Buffer | ArrayBuffer): RegistroHist
   const iCred = header.indexOf("Créditos");
   const iName = header.indexOf("Nombre curso");
   const iPre = header.indexOf("Código prerrequisito");
+  const iRes = header.indexOf("Restricción de periodo");
+  const iLvl = header.indexOf("Restricción de nivel");
   if (iPer < 0 || iMat < 0) return out;
   const clean = (v: unknown) => {
     const s = String(v ?? "").trim();
@@ -57,6 +74,8 @@ export function parseRegistroHistory(buffer: Buffer | ArrayBuffer): RegistroHist
       name: iName >= 0 ? clean(row[iName]) : "",
       credits: Number.isFinite(credits) ? credits : null,
       prereqText: iPre >= 0 ? clean(row[iPre]) : "",
+      restriction: iRes >= 0 ? clean(row[iRes]) : "",
+      level: iLvl >= 0 ? clean(row[iLvl]) : "",
     });
     out.set(code, list);
   }
@@ -156,6 +175,10 @@ export interface ElectiveHistoryInfo {
   registroName: string | null;
   registroCredits: number | null;
   registroPrereqText: string | null;
+  /** "excluye semestres 1–n" at that period → 15 × n */
+  minCredits: number | null;
+  /** "Restricción de nivel" at that period */
+  registroLevel: string | null;
 }
 
 /** Excel values win; blanks are filled from the Registro history. */
@@ -178,5 +201,7 @@ export function electiveHistory(
     registroName: last?.name || null,
     registroCredits: last?.credits ?? null,
     registroPrereqText: last?.prereqText || null,
+    minCredits: restrictionToCredits(last?.restriction)?.minCredits ?? null,
+    registroLevel: last?.level || null,
   };
 }

@@ -77,7 +77,7 @@ export default function ChainMiniature({
         </div>
         <span className={styles.chainArrow}>→</span>
         <div className={styles.chainCol}>
-          <span className={styles.lbl}>Desbloquea</span>
+          <span className={styles.lbl}>La piden</span>
           {dependents.length === 0 ? (
             <span className={styles.chainNone}>Nada, es fin de cadena</span>
           ) : (

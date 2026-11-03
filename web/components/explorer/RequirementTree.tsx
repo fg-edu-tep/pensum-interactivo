@@ -1,9 +1,9 @@
 "use client";
 
-import type { Course } from "@/lib/types";
+import { SPANISH_WRITING_CODE_RE, type Course } from "@/lib/types";
 import { renderRequirement } from "@/lib/requirementText";
 import { numberRequirementGroups } from "./reqGroups";
-import { spaceCode } from "./format";
+import { spaceCode, toSentenceCase } from "./format";
 import { CheckIcon } from "./icons";
 import styles from "./explorer.module.css";
 
@@ -14,11 +14,54 @@ interface Props {
   mode: "explore" | "progress";
   approved: Set<string>;
   onSelectCourse: (id: string) => void;
+  /** credits(A), for the "N créditos aprobados" node */
+  approvedCredits?: number;
+  /** code → name for courses outside the plan (official load) */
+  codeNames?: Record<string, string>;
 }
 
-export default function RequirementTree({ course, allCourses, catalogCodes, mode, approved, onSelectCourse }: Props) {
+/** Registro's "excluye semestres 1–n" restriction, read as 15 × n approved credits. */
+function CreditNode({ course, mode, approvedCredits, number }: { course: Course; mode: Props["mode"]; approvedCredits: number; number: number }) {
+  const min = course.minCredits!;
+  const done = mode === "progress" && approvedCredits >= min;
+  return (
+    <div className={styles.reqRow}>
+      <span className={styles.reqRowNum}>{number}</span>
+      <div className={styles.reqBox}>
+        <span className={styles.reqSingle}>
+          {min} créditos aprobados
+          {course.minCreditsSemesters === 1
+            ? " (no primer semestre)"
+            : course.minCreditsSemesters
+              ? ` (equivale a ${course.minCreditsSemesters} semestres)`
+              : ""}
+        </span>
+        <span className={styles.reqFallbackNote}>
+          {mode === "progress" ? `llevas ${approvedCredits}` : "Registro la restringe a estudiantes avanzados"}
+        </span>
+      </div>
+      {mode === "progress" && (
+        <span className={styles.reqStatus}>
+          {done ? <CheckIcon /> : <span style={{ display: "inline-block", width: 11, height: 11, border: "1.5px solid var(--line-control)", borderRadius: "999px" }} />}
+        </span>
+      )}
+    </div>
+  );
+}
+
+export default function RequirementTree({ course, allCourses, catalogCodes, mode, approved, onSelectCourse, approvedCredits = 0, codeNames = {} }: Props) {
+  const outName = (code: string) => (codeNames[code] ? toSentenceCase(codeNames[code]) : null);
+  const hasCredits = typeof course.minCredits === "number" && course.minCredits > 0;
   if (!course.prereqTree && course.prereqCourseIds.length === 0) {
-    return <p className={styles.reqFallbackNote}>Sin prerrequisitos.</p>;
+    if (!hasCredits) return <p className={styles.reqFallbackNote}>Sin prerrequisitos.</p>;
+    return (
+      <>
+        <div className={styles.reqHeading}>
+          <h3>Para inscribirla necesitas</h3>
+        </div>
+        <CreditNode course={course} mode={mode} approvedCredits={approvedCredits} number={1} />
+      </>
+    );
   }
 
   const groups = numberRequirementGroups(course, allCourses, catalogCodes);
@@ -63,13 +106,20 @@ export default function RequirementTree({ course, allCourses, catalogCodes, mode
                     <span className="code">{byNormalized.get(g.code)?.code ?? spaceCode(g.code)}</span> {g.label}
                   </button>
                 ) : (
-                  <span className={styles.reqSingle}>{spaceCode(g.code)} · fuera de este pensum</span>
+                  <span className={styles.reqSingle}>
+                    {spaceCode(g.code)}
+                    {outName(g.code) ? ` ${outName(g.code)}` : ""} · fuera de este pensum
+                  </span>
                 ))}
               {g.kind === "course" && g.soft && <span className={styles.reqFallbackNote}>puede cursarse al tiempo</span>}
               {g.kind === "requirement" && <span className={styles.reqSingle}>{g.label} · requisito de grado</span>}
               {g.kind === "or" && (
                 <>
-                  <span className={styles.orLabel}>Uno de estos</span>
+                  <span className={styles.orLabel}>
+                    {g.options.length > 0 && g.options.every((o) => SPANISH_WRITING_CODE_RE.test(o.code))
+                      ? "Requisito de escritura en español · uno de estos"
+                      : "Uno de estos"}
+                  </span>
                   <div className={styles.orWrap}>
                     {g.options.map((o) =>
                       o.inPensum ? (
@@ -82,8 +132,9 @@ export default function RequirementTree({ course, allCourses, catalogCodes, mode
                           {byNormalized.get(o.code)?.code ?? spaceCode(o.code)}
                         </button>
                       ) : (
-                        <span key={o.code} className={styles.orPillOut} title="fuera de este pensum">
+                        <span key={o.code} className={styles.orPillOut} title={`${outName(o.code) ?? ""} · fuera de este pensum`.replace(/^ · /, "")}>
                           {spaceCode(o.code)}
+                          {outName(o.code) ? ` · ${outName(o.code)}` : ""}
                         </span>
                       )
                     )}
@@ -99,6 +150,12 @@ export default function RequirementTree({ course, allCourses, catalogCodes, mode
           </div>
         </div>
       ))}
+      {hasCredits && (
+        <div>
+          <div className={styles.andConnector}>Y</div>
+          <CreditNode course={course} mode={mode} approvedCredits={approvedCredits} number={total + 1} />
+        </div>
+      )}
     </>
   );
 }

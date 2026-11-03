@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 
 const LINKS = [
   { href: "/administrador", label: "Catálogos", exact: true },
+  { href: "/administrador/carga", label: "Carga oficial" },
   { href: "/administrador/importar", label: "Importar" },
   { href: "/administrador/registro", label: "Registro" },
   { href: "/administrador/discrepancias", label: "Discrepancias" },

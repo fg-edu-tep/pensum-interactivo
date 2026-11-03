@@ -41,6 +41,7 @@ export default function CourseRow({ slug, course, prevId, nextId }: Props) {
     placeholderLabel: course.placeholderLabel,
     prereqText: course.prereqText,
     description: course.description,
+    nextOfferingTerm: course.nextOfferingTerm,
   });
   const [locked, setLocked] = useState<string[]>(course.lockedFields);
   const [busy, setBusy] = useState<string | null>(null);
@@ -57,6 +58,7 @@ export default function CourseRow({ slug, course, prevId, nextId }: Props) {
     placeholderLabel: course.placeholderLabel,
     prereqText: course.prereqText,
     description: course.description,
+    nextOfferingTerm: course.nextOfferingTerm,
   };
   const scalarDirty = (Object.keys(orig) as (keyof typeof orig)[]).some(
     (k) => k !== "description" && f[k] !== orig[k]
@@ -92,6 +94,7 @@ export default function CourseRow({ slug, course, prevId, nextId }: Props) {
         if (f.placeholderLabel !== orig.placeholderLabel)
           body.placeholderLabel = f.placeholderLabel || null;
         if (f.prereqText !== orig.prereqText) body.prereqText = f.prereqText;
+        if (f.nextOfferingTerm !== orig.nextOfferingTerm) body.nextOfferingTerm = f.nextOfferingTerm.trim();
         const res = await fetch(
           `/api/admin/catalogs/${slug}/courses/${course.id}`,
           {
@@ -337,6 +340,22 @@ export default function CourseRow({ slug, course, prevId, nextId }: Props) {
           </div>
         )}
       </div>
+
+      {!course.isPlaceholder && course.normalizedCode && (
+        <div className="er-field">
+          <span>Próxima oferta planeada</span>
+          <input
+            className={`admin-input${f.nextOfferingTerm && !/^\d{4}(10|20|19)$/.test(f.nextOfferingTerm.trim()) ? " dirty" : ""}`}
+            placeholder="p. ej. 202710"
+            value={f.nextOfferingTerm}
+            onChange={(e) => setF({ ...f, nextOfferingTerm: e.target.value })}
+          />
+          <span className="admin-note">
+            Última vez ofrecida (Registro): {course.lastOfferedTerm ?? "sin datos"}
+            {course.minCredits ? ` · Restricción: ${course.minCredits} créditos aprobados` : ""}
+          </span>
+        </div>
+      )}
 
       {!course.isPlaceholder && course.normalizedCode && (
         <div className="er-field er-wide">

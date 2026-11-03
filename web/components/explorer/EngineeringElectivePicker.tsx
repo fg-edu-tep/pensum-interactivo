@@ -68,7 +68,8 @@ export default function EngineeringElectivePicker({ term, mode, assignment, slot
       <h3>Cursos válidos · Fundamentos de Ingeniería</h3>
       <p className="elective-hint">
         Sirve <strong>cualquier curso de Ingeniería</strong>: todos los códigos que empiezan por <strong>I</strong> (
-        {EXAMPLES.join(", ")}…).
+        {EXAMPLES.join(", ")}…). <strong>Verifica sus prerrequisitos</strong> antes de inscribirla: como no hay una
+        lista cerrada, aquí no podemos revisarlos por ti.
       </p>
 
       {canPick && assignment && (

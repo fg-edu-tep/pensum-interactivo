@@ -26,10 +26,16 @@ export default async function ImportJobPage({
         {new Date(job.uploadedAt).toLocaleString("es-CO")} · estado: {job.status}
       </p>
 
+      {job.scope === "official" && (
+        <p className="admin-note">
+          Este diff es parte de una <Link href={`/administrador/carga/${job.id}`}>carga oficial</Link>: se aplica desde allí, junto con la bolsa de
+          electivas y los requisitos.
+        </p>
+      )}
       {!diff ? (
         <p className="admin-note">Sin diff (el archivo no se pudo procesar).</p>
       ) : (
-        <ImportReview jobId={job.id} status={job.status} diff={diff} />
+        <ImportReview jobId={job.id} status={job.scope === "official" && job.status === "parsed" ? "review-only" : job.status} diff={diff} />
       )}
     </>
   );
