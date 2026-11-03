@@ -20,6 +20,8 @@ interface DocumentRow {
   prereqTree: unknown;
   coreqText: string | null;
   coreqTree: unknown;
+  prereqOverride?: boolean;
+  coreqOverride?: boolean;
 }
 
 export function apiDetailsOf(o: OfferingRow): ApiDetails {
@@ -46,6 +48,8 @@ export function requirementCandidates(
       prereqTree: (doc.prereqTree as ReqNode | null) ?? null,
       coreqText: doc.coreqText,
       coreqTree: (doc.coreqTree as ReqNode | null) ?? null,
+      prereqOverride: doc.prereqOverride ?? false,
+      coreqOverride: doc.coreqOverride ?? false,
     },
     registro,
     history: history.map(apiDetailsOf),

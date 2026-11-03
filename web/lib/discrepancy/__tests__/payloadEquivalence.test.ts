@@ -61,8 +61,8 @@ test("every course: discrepancy governance == what buildCatalogPayload gives stu
       }
       checked++;
       const extra = { registro: input.registro, history: input.history };
-      const pre = d.effectiveTree("prereq", input.offering, input.docPrereqTree, { ...extra, docText: input.docPrereqText });
-      const co = d.effectiveTree("coreq", input.offering, input.docCoreqTree, { ...extra, docText: input.docCoreqText });
+      const pre = d.effectiveTree("prereq", input.offering, input.docPrereqTree, { ...extra, docText: input.docPrereqText, override: input.prereqOverride });
+      const co = d.effectiveTree("coreq", input.offering, input.docCoreqTree, { ...extra, docText: input.docCoreqText, override: input.coreqOverride });
       if (canon(pre.tree) !== canon(student.prereqTree)) mismatches.push(`${slug}/${input.code}: prereq tree differs`);
       if (canon(co.tree) !== canon(student.coreqTree)) mismatches.push(`${slug}/${input.code}: coreq tree differs`);
       if (pre.governor !== (student.prereqSource === "api" ? "api" : "document") && !(student.prereqSource === null && pre.governor === "document"))

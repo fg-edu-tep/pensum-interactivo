@@ -80,3 +80,37 @@ test("4. last resort: the API data of another term, newest first", () => {
 test("nothing anywhere => no requirement, source null", () => {
   assert.deepEqual(resolveRequirement("coreq", cands()), { tree: null, text: "", source: null, sourceTerm: null });
 });
+
+test("0. admin override: the document beats the live API", () => {
+  const r = resolveRequirement(
+    "prereq",
+    cands({
+      current: api({ apiPrereqText: "IELE 1001", apiPrereqTree: t("IELE 1001") }),
+      document: { ...emptyDoc, prereqText: "IELE 9999", prereqTree: t("IELE 9999"), prereqOverride: true },
+    })
+  );
+  assert.deepEqual([r.source, r.text, r.overridden], ["document", "IELE 9999", true]);
+});
+
+test("0. admin override with an empty document = no requirement (the Registro is not consulted)", () => {
+  const r = resolveRequirement(
+    "coreq",
+    cands({
+      current: api({ apiCoreqTree: t("IELE 1118") }),
+      document: { ...emptyDoc, coreqOverride: true },
+      registro: { period: "202620", prereqText: null, coreqText: "IELE-1118L" },
+    })
+  );
+  assert.deepEqual([r.source, r.tree, r.text, r.overridden], ["document", null, "", true]);
+});
+
+test("0. the override is per field: a prereq override leaves the coreq to the API", () => {
+  const r = resolveRequirement(
+    "coreq",
+    cands({
+      current: api({ apiCoreqTree: t("IELE 1118") }),
+      document: { ...emptyDoc, coreqText: "IELE 9999", coreqTree: t("IELE 9999"), prereqOverride: true },
+    })
+  );
+  assert.equal(r.source, "api");
+});

@@ -124,6 +124,10 @@ model CatalogCourse {
   coreqText         String?
   prereqTree        Json? // ReqNode | null — consumed as-is by lib/availability.ts
   coreqTree         Json?
+  /// admin override: this row's prereqText/coreqText decides what students see
+  /// even when the live API has data (lib/requirementResolve.ts)
+  prereqOverride    Boolean @default(false)
+  coreqOverride     Boolean @default(false)
   pairingStatus     String  @default("needs_manual")
   // auto_paired | not_offered | needs_manual | manual_resolved | placeholder_pool | sync_failed
   /// set once an admin edits this row by hand — a re-import must not silently
@@ -324,8 +328,28 @@ model AdminUser {
   updatedAt    DateTime  @updatedAt
 
   resetTokens PasswordResetToken[]
+  apiTokens   AdminApiToken[]
 
   @@index([disabled])
+}
+
+/// Personal access token for the MCP endpoint (/api/mcp). Only the SHA-256 of
+/// the secret is stored; the secret is shown once at creation (lib/auth/apiTokens.ts).
+model AdminApiToken {
+  id         Int       @id @default(autoincrement())
+  userId     Int
+  name       String
+  tokenHash  String    @unique
+  /// first characters of the secret, to tell tokens apart in the panel
+  prefix     String
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  expiresAt  DateTime?
+  revokedAt  DateTime?
+
+  user AdminUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 /// Singleton-ish key/value store for auth bootstrap state. Rows today:

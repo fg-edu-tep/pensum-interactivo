@@ -23,7 +23,8 @@ export default function DiscrepancyAlert({
   compact?: boolean;
 }) {
   const f = field;
-  const detailed = !compact && (f.status === "differs" || f.status === "doc-hidden" || f.status === "api-only" || f.status === "soft-only");
+  const overridden = f.status === "overridden";
+  const detailed = !compact && (f.status === "differs" || f.status === "doc-hidden" || f.status === "api-only" || f.status === "soft-only" || f.status === "overridden");
   return (
     <div className={`disc-alert ${f.severity}`} role={f.severity === "warn" ? "alert" : "status"} data-status={f.status}>
       <div className="disc-head">
@@ -32,11 +33,11 @@ export default function DiscrepancyAlert({
       </div>
       {detailed && (
         <dl className="disc-detail">
-          <dt>Oficial (API){day(f.apiSyncedAt) ? `, sincronizado ${day(f.apiSyncedAt)}` : ""} — lo que ven los estudiantes</dt>
+          <dt>Oficial (API){day(f.apiSyncedAt) ? `, sincronizado ${day(f.apiSyncedAt)}` : ""}{overridden ? "" : " — lo que ven los estudiantes"}</dt>
           <dd>
-            <code>{expr(f.governor === "api" ? f.apiText : f.visibleText)}</code>
+            <code>{expr(f.governor === "api" || overridden ? f.apiText : f.visibleText)}</code>
           </dd>
-          <dt>Documento (respaldo: seed, Registro o edición manual)</dt>
+          <dt>{overridden ? "Documento — lo que ven los estudiantes (reemplazo del administrador)" : "Documento (respaldo: seed, Registro o edición manual)"}</dt>
           <dd>
             <code>{expr(f.documentText)}</code>
           </dd>

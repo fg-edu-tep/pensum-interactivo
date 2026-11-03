@@ -21,6 +21,7 @@ const LOCKABLE = [
   "category",
   "placeholderLabel",
   "prereqText",
+  "coreqText",
 ] as const;
 
 interface Props {
@@ -43,6 +44,9 @@ export default function CourseRow({ slug, course, prevId, nextId }: Props) {
     placeholderKind: course.placeholderKind,
     placeholderLabel: course.placeholderLabel,
     prereqText: course.prereqText,
+    coreqText: course.coreqText,
+    prereqOverride: course.prereqOverride,
+    coreqOverride: course.coreqOverride,
     description: course.description,
     nextOfferingTerm: course.nextOfferingTerm,
   });
@@ -61,6 +65,9 @@ export default function CourseRow({ slug, course, prevId, nextId }: Props) {
     placeholderKind: course.placeholderKind,
     placeholderLabel: course.placeholderLabel,
     prereqText: course.prereqText,
+    coreqText: course.coreqText,
+    prereqOverride: course.prereqOverride,
+    coreqOverride: course.coreqOverride,
     description: course.description,
     nextOfferingTerm: course.nextOfferingTerm,
   };
@@ -99,6 +106,9 @@ export default function CourseRow({ slug, course, prevId, nextId }: Props) {
         if (f.placeholderLabel !== orig.placeholderLabel)
           body.placeholderLabel = f.placeholderLabel || null;
         if (f.prereqText !== orig.prereqText) body.prereqText = f.prereqText;
+        if (f.coreqText !== orig.coreqText) body.coreqText = f.coreqText;
+        if (f.prereqOverride !== orig.prereqOverride) body.prereqOverride = f.prereqOverride;
+        if (f.coreqOverride !== orig.coreqOverride) body.coreqOverride = f.coreqOverride;
         if (f.nextOfferingTerm !== orig.nextOfferingTerm) body.nextOfferingTerm = f.nextOfferingTerm.trim();
         const res = await fetch(
           `/api/admin/catalogs/${slug}/courses/${course.id}`,
@@ -342,7 +352,7 @@ export default function CourseRow({ slug, course, prevId, nextId }: Props) {
 
       <div className="er-field er-wide">
         <span>
-          Prerrequisito (respaldo) <Lock field="prereqText" />
+          Prerrequisito {f.prereqOverride ? "(reemplaza la API)" : "(respaldo)"} <Lock field="prereqText" />
         </span>
         <textarea
           className="admin-textarea"
@@ -350,17 +360,38 @@ export default function CourseRow({ slug, course, prevId, nextId }: Props) {
           value={f.prereqText}
           onChange={(e) => setF({ ...f, prereqText: e.target.value })}
         />
+        <OverrideToggle
+          checked={f.prereqOverride}
+          onChange={(v) => setF({ ...f, prereqOverride: v })}
+        />
         {course.discrepancy && course.discrepancy.prereq.status !== "match" && (
           <DiscrepancyAlert field={course.discrepancy.prereq} compact={course.discrepancy.prereq.status === "unverified"} />
         )}
-        {course.discrepancy && course.discrepancy.coreq.severity === "warn" && (
+        {f.prereqText !== orig.prereqText && !f.prereqOverride && course.discrepancy?.prereq.governor === "api" && (
+          <ApiKeepsPriority />
+        )}
+      </div>
+
+      <div className="er-field er-wide">
+        <span>
+          Correquisito {f.coreqOverride ? "(reemplaza la API)" : "(respaldo)"} <Lock field="coreqText" />
+        </span>
+        <textarea
+          className="admin-textarea"
+          rows={1}
+          placeholder="p. ej. IELE 1118L"
+          value={f.coreqText}
+          onChange={(e) => setF({ ...f, coreqText: e.target.value })}
+        />
+        <OverrideToggle
+          checked={f.coreqOverride}
+          onChange={(v) => setF({ ...f, coreqOverride: v })}
+        />
+        {course.discrepancy && (course.discrepancy.coreq.severity === "warn" || course.discrepancy.coreq.status === "overridden") && (
           <DiscrepancyAlert field={course.discrepancy.coreq} />
         )}
-        {f.prereqText !== orig.prereqText && course.discrepancy?.prereq.governor === "api" && (
-          <div className="disc-alert warn" role="status">
-            ⚠ Este curso tiene datos oficiales de la API: aunque guardes este cambio, los estudiantes seguirán viendo los
-            de la API. Solo se usa este valor si la API no tiene datos del curso.
-          </div>
+        {f.coreqText !== orig.coreqText && !f.coreqOverride && course.discrepancy?.coreq.governor === "api" && (
+          <ApiKeepsPriority />
         )}
       </div>
 
@@ -470,6 +501,24 @@ export default function CourseRow({ slug, course, prevId, nextId }: Props) {
           <span className={msg.ok ? "admin-saved" : "admin-error"}>{msg.text}</span>
         )}
       </div>
+    </div>
+  );
+}
+
+function OverrideToggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="admin-note" style={{ display: "flex", gap: 6, alignItems: "center" }}>
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      Usar este valor en lugar de la API (vacío = sin requisito)
+    </label>
+  );
+}
+
+function ApiKeepsPriority() {
+  return (
+    <div className="disc-alert warn" role="status">
+      ⚠ Este curso tiene datos oficiales de la API: aunque guardes este cambio, los estudiantes seguirán viendo los
+      de la API. Solo se usa este valor si la API no tiene datos del curso, o si marcas «Usar este valor en lugar de la API».
     </div>
   );
 }

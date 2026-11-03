@@ -17,7 +17,7 @@ what's next (P2 admin, P3 Docker), and the gotchas.
   `mysql-migration` is the official release; this `main`/Vercel/Neon build is a temporary
   preview), **admin auth** (DB-backed multi-user
   accounts + one-time setup + 12-word master-secret super-panel — see
-  [`docs/admin-auth.md`](docs/admin-auth.md)), the October 2026 design pass, user flows, and the **admin visual pensum editor** (`/administrador/catalogos/[slug]/mapa`, [`docs/admin-visual-editor.md`](docs/admin-visual-editor.md)).
+  [`docs/admin-auth.md`](docs/admin-auth.md)), the October 2026 design pass, user flows, the **admin visual pensum editor** (`/administrador/catalogos/[slug]/mapa`, [`docs/admin-visual-editor.md`](docs/admin-visual-editor.md)), and **MCP access** for assistants to edit course prerequisites/corequisites with personal access tokens (`/api/mcp`, [`docs/admin-mcp.md`](docs/admin-mcp.md)).
 
 ## Layout
 

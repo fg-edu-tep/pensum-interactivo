@@ -31,6 +31,7 @@ The first source that **has data** wins; an empty source is skipped, never read 
 
 | # | Source | Used when | `source` |
 |---|---|---|---|
+| 0 | Document, by **admin override** (`CatalogCourse.prereqOverride` / `coreqOverride`, set in the course editor or over MCP — [`admin-mcp.md`](admin-mcp.md)) | the override is on — even when empty (= no requirement) | `document` |
 | 1 | Live API for the catalog's term (`off.apiPrereqTree` / `apiCoreqTree`) | it has a tree — or `detailsFetched` and the API lists none (prereqs: only when the API text is empty; unparseable text falls through) | `api` |
 | 2 | Document (`CatalogCourse.prereqText/Tree`, `coreqText/Tree`: seed, PLANES, Registro wizard, admin edits) | it has a tree | `document` |
 | 3 | Registro upload (`RegistroCourse` of the latest *applied* import; before any is applied, the latest one not discarded) | it has text | `registro` |
@@ -59,6 +60,7 @@ For every real (non-placeholder) course of every catalog, for **each** of prereq
 | `doc-hidden` | the API confirms *no* requirement, the document has one → not applied in the map | **warn** |
 | `api-only` | the API has a requirement, the document is empty | info |
 | `unverified` | no usable API data → the document governs and cannot be checked | info |
+| `overridden` | an admin override makes the document win, and it differs from the API (or the API has no data). An override that agrees with the API reads as `match` / `soft-only` | info |
 
 `unverified` carries a reason: no offering row for the term · not offered · offering sync
 failed · courseDetails never fetched · courseDetails fetch failed · API text could not be parsed.
