@@ -54,6 +54,8 @@ export async function loadCourseInputs(slugs?: string[]): Promise<Map<string, { 
         docCoreqTree: (cc.coreqTree as ReqNode | null) ?? null,
         manuallyEdited: cc.manuallyEdited,
         lockedFields: (cc.lockedFields as string[] | null) ?? [],
+        prereqOverride: cc.prereqOverride,
+        coreqOverride: cc.coreqOverride,
         offering: o
           ? {
               offered: o.offered,

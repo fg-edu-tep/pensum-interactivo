@@ -193,3 +193,30 @@ test("summarize: counts fields by status, severity and governor", () => {
   assert.equal(s.apiGoverned + s.documentGoverned, 6);
   assert.equal(s.documentGoverned, 2);
 });
+
+// ---------------------------------------------------------------- admin override
+test("override: the document is what students see, flagged 'overridden' while it differs from the API", () => {
+  const c = course({
+    docPrereqText: "IELE 9999", docPrereqTree: t("IELE 9999"), prereqOverride: true,
+    offering: off({ apiPrereqText: "IELE 1001", apiPrereqTree: t("IELE 1001") }),
+  });
+  const f = reportField(c, "prereq");
+  assert.deepEqual([f.status, f.severity, f.governor, f.visibleText], ["overridden", "info", "document", "IELE 9999"]);
+  assert.deepEqual([f.onlyInApi, f.onlyInDocument], [["IELE1001"], ["IELE9999"]]);
+  assert.match(headlineFor(f), /reemplazó la API/);
+});
+
+test("override that agrees with the API reads as a match", () => {
+  const c = course({
+    docPrereqText: "IELE 1001", docPrereqTree: t("IELE 1001"), prereqOverride: true,
+    offering: off({ apiPrereqText: "IELE 1001", apiPrereqTree: t("IELE 1001") }),
+  });
+  assert.equal(reportField(c, "prereq").status, "match");
+});
+
+test("override without API data still says 'overridden', and summarize counts it", () => {
+  const c = course({ docCoreqText: "IELE 1118", docCoreqTree: t("IELE 1118"), coreqOverride: true, offering: null });
+  const r = reportCourse(c);
+  assert.equal(r.coreq.status, "overridden");
+  assert.equal(summarize([r]).byStatus.overridden, 1);
+});

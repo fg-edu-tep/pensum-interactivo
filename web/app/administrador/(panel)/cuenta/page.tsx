@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { SESSION_COOKIE, sessionUsername } from "@/lib/auth/session";
 import { normalizeUsername } from "@/lib/auth/users";
 import ChangePasswordForm from "./ChangePasswordForm";
+import ApiTokens from "./ApiTokens";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +36,7 @@ export default async function CuentaPage() {
         </p>
       )}
       <ChangePasswordForm />
+      <ApiTokens />
     </>
   );
 }

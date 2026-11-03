@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
 import { normalizeCode } from "@/lib/import/normalizeCode";
 import { parseRequirement } from "@/lib/import/requirementParser";
+import { parseCoreqText } from "@/lib/requirementResolve";
 import { isCourseCategory } from "@/lib/courseCategory";
 import { syncCatalogCourses, type SyncedCourse } from "@/lib/pairing/syncCatalogCourses";
 
@@ -82,6 +83,21 @@ export async function PATCH(
     data.prereqText = text || null;
     data.prereqTree = (parseRequirement(text) ??
       Prisma.JsonNull) as unknown as Prisma.InputJsonValue;
+  }
+
+  if ("coreqText" in body) {
+    before.coreqText = row.coreqText;
+    const text = String(body.coreqText ?? "").trim();
+    data.coreqText = text || null;
+    data.coreqTree = (parseCoreqText(text) ??
+      Prisma.JsonNull) as unknown as Prisma.InputJsonValue;
+  }
+
+  // admin override: the plan's own value beats the API (lib/requirementResolve.ts)
+  for (const f of ["prereqOverride", "coreqOverride"] as const) {
+    if (!(f in body)) continue;
+    before[f] = row[f];
+    data[f] = Boolean(body[f]);
   }
 
   if ("lockedFields" in body) {

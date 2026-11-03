@@ -29,7 +29,8 @@ export type Status =
   | "differs" // the document asks for something different from the API
   | "doc-hidden" // API says "no requirement", document has one -> students see none
   | "api-only" // API has a requirement, document is empty
-  | "unverified"; // no usable API data: the document governs and cannot be checked
+  | "unverified" // no usable API data: the document governs and cannot be checked
+  | "overridden"; // an admin made the document win over the API, and they differ
 
 export type Severity = "warn" | "info" | "ok";
 
@@ -65,6 +66,9 @@ export interface CourseInput {
   docCoreqTree: ReqNode | null;
   manuallyEdited: boolean;
   lockedFields: string[];
+  /** admin override (CatalogCourse.prereqOverride/coreqOverride) */
+  prereqOverride?: boolean;
+  coreqOverride?: boolean;
   /** the offering for the CATALOG's term (null when there is none) */
   offering: OfferingInput | null;
   /** secondary sources used when the API and the document have nothing */
@@ -125,15 +129,15 @@ export function effectiveTree(
   field: Field,
   o: OfferingInput | null,
   docTree: ReqNode | null,
-  extra: { docText?: string | null; registro?: RegistroEntry | null; history?: ApiDetails[] } = {}
+  extra: { docText?: string | null; registro?: RegistroEntry | null; history?: ApiDetails[]; override?: boolean } = {}
 ): { tree: ReqNode | null; governor: Governor; source: RequirementSource; sourceTerm: string | null; text: string } {
   const docText = extra.docText ?? null;
   const r = resolveRequirement(field, {
     current: currentDetails(o),
     document:
       field === "prereq"
-        ? { prereqText: docText, prereqTree: docTree, coreqText: null, coreqTree: null }
-        : { prereqText: null, prereqTree: null, coreqText: docText, coreqTree: docTree },
+        ? { prereqText: docText, prereqTree: docTree, coreqText: null, coreqTree: null, prereqOverride: extra.override }
+        : { prereqText: null, prereqTree: null, coreqText: docText, coreqTree: docTree, coreqOverride: extra.override },
     registro: extra.registro ?? null,
     history: extra.history ?? [],
   });
@@ -170,6 +174,7 @@ const SEVERITY: Record<Status, Severity> = {
   unverified: "info",
   differs: "warn",
   "doc-hidden": "warn",
+  overridden: "info",
 };
 
 export function reportField(c: CourseInput, field: Field): FieldReport {
@@ -178,10 +183,12 @@ export function reportField(c: CourseInput, field: Field): FieldReport {
   const docText = (field === "prereq" ? c.docPrereqText : c.docCoreqText) ?? "";
   const apiTree = field === "prereq" ? (o?.apiPrereqTree ?? null) : (o?.apiCoreqTree ?? null);
   const apiText = field === "prereq" ? (o?.apiPrereqText ?? "") : renderRegistroExpr(apiTree);
+  const override = !!(field === "prereq" ? c.prereqOverride : c.coreqOverride);
   const { tree: visible, governor, source, sourceTerm, text: visibleText } = effectiveTree(field, o, docTree, {
     docText,
     registro: c.registro,
     history: c.history,
+    override,
   });
 
   const base = {
@@ -198,6 +205,14 @@ export function reportField(c: CourseInput, field: Field): FieldReport {
     onlyInApi: [] as string[],
     onlyInDocument: [] as string[],
   };
+
+  if (override) {
+    // the document wins by decision; still say whether the API agrees
+    const hasApi = !!apiTree || (field === "prereq" ? detailsFetched(o) && !o?.apiPrereqText : detailsFetched(o));
+    const cmp = compareTrees(apiTree, docTree);
+    const status: Status = !hasApi || cmp.relation === "different" ? "overridden" : cmp.relation === "same" ? "match" : "soft-only";
+    return { ...base, status, severity: SEVERITY[status], onlyInApi: cmp.onlyInApi, onlyInDocument: cmp.onlyInDocument };
+  }
 
   if (governor === "document") {
     return { ...base, status: "unverified", severity: SEVERITY.unverified, unverifiedReason: unverifiedReason(o, field) };
@@ -247,7 +262,7 @@ export interface Summary {
 
 export function summarize(reports: CourseReport[]): Summary {
   const byStatus: Record<Status, number> = {
-    match: 0, "soft-only": 0, differs: 0, "doc-hidden": 0, "api-only": 0, unverified: 0,
+    match: 0, "soft-only": 0, differs: 0, "doc-hidden": 0, "api-only": 0, unverified: 0, overridden: 0,
   };
   let warn = 0, info = 0, apiGoverned = 0, documentGoverned = 0;
   for (const r of reports) {
@@ -270,6 +285,7 @@ export const STATUS_LABEL: Record<Status, string> = {
   "doc-hidden": "El documento tiene un requisito que la API no",
   "api-only": "La API tiene un requisito que el documento no",
   unverified: "Sin datos de la API",
+  overridden: "Reemplaza a la API",
 };
 
 export const CAUSE_LABEL: Record<Cause, string> = {
@@ -326,5 +342,7 @@ export function headlineFor(
       return `Sin datos oficiales (${f.unverifiedReason ? UNVERIFIED_LABEL[f.unverifiedReason] : "sin datos"}): ${fallbackClause(f)}.`;
     case "match":
       return `Los ${what} coinciden con la API.`;
+    case "overridden":
+      return `Un administrador reemplazó la API: los estudiantes ven los ${what} del documento${f.documentText?.trim() ? "" : " (ninguno)"}.`;
   }
 }
