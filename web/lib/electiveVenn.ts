@@ -33,6 +33,8 @@ export interface VennElectiveInput {
   attrs?: Partial<Record<"IELE" | "IELC", { obligatoria?: boolean; electiva?: boolean; integrador?: boolean }>> | null;
   /** the bag's raw PROXIMO ("202810" | "SEM" | "NODEF" | null) */
   projection?: string | null;
+  /** Registro credits (official load) */
+  registroCredits?: number | null;
 }
 
 /** What a course is worth to one program (2026-10-29: independent attributes —
@@ -55,6 +57,7 @@ export interface VennElective {
   ele: ProgramTag | null;
   elc: ProgramTag | null;
   projection: string | null;
+  credits: number | null;
 }
 
 const isElective = (cell: { norm: string | null } | null | undefined) =>
@@ -95,6 +98,7 @@ export function toVennElectives(rows: VennElectiveInput[]): VennElective[] {
       ele,
       elc,
       projection: e.projection ?? null,
+      credits: e.registroCredits ?? null,
     };
   });
 }
