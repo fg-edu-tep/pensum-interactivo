@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2b82dc"/>
+      <stop offset="1" stop-color="#164f8f"/>
+    </linearGradient>
+    <radialGradient id="glass" cx="0.42" cy="0.38" r="0.7">
+      <stop offset="0" stop-color="#fff6c2"/>
+      <stop offset="0.55" stop-color="#ffd84a"/>
+      <stop offset="1" stop-color="#f5a623"/>
+    </radialGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
+  <g stroke="#ffe27a" stroke-width="2.4" stroke-linecap="round" opacity="0.9">
+    <path d="M32 4.5v3.5M13.5 12l2.6 2.6M50.5 12l-2.6 2.6M8 27h3.5M56 27h-3.5"/>
+  </g>
+  <path d="M25 41c0-5-7-8-7-15a14 14 0 1 1 28 0c0 7-7 10-7 15z" fill="url(#glass)"/>
+  <path d="M23 23a9.5 9.5 0 0 1 7-8" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" opacity="0.75"/>
+  <path d="M28.5 41v-7l2-3 1.5 2.5 1.5-2.5 2 3v7" fill="none" stroke="#a85d00" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="24.5" y="42" width="15" height="4" rx="1.6" fill="#eef2f7"/>
+  <rect x="25.5" y="47" width="13" height="4" rx="1.6" fill="#c9d3e0"/>
+  <rect x="28.5" y="52" width="7" height="3.2" rx="1.6" fill="#eef2f7"/>
+</svg>
